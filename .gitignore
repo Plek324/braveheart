@@ -1,0 +1,12 @@
+# Dependencies
+node_modules/
+
+# Secrets (never commit these)
+secrets.env
+
+# Output data
+data/
+
+# Environment
+.env
+.env.local

@@ -1,0 +1,21 @@
+{
+  "name": "ship-tracker",
+  "version": "1.0.0",
+  "description": "Track ships by MMSI using AISStream websocket",
+  "main": "tracker.js",
+  "scripts": {
+    "start": "node tracker.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "ais",
+    "ship",
+    "tracking",
+    "mmsi"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "ws": "^8.16.0"
+  }
+}
