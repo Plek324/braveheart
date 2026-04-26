@@ -1,0 +1,16 @@
+version: "3.8"
+
+services:
+  tracker:
+    build: .
+    container_name: braveheart-tracker
+    volumes:
+      # Mount secrets.env from host
+      - ./secrets.env:/app/secrets.env:ro
+      # Share ship_locations.json with other containers
+      - ship-data:/app/data
+    restart: unless-stopped
+
+volumes:
+  # Named volume for sharing ship location data with other applications
+  ship-data:

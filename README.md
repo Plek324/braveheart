@@ -39,9 +39,58 @@ npm start
 
 The tracker will connect to AISStream and begin recording location data. Each position update is saved immediately to `ship_locations.json`.
 
-## Output
+## Docker
 
-Location data is saved to `ship_locations.json` with the following format:
+You can run this application in a Docker container. The ship location data is stored in a named volume that can be shared with other applications.
+
+### Prerequisites
+
+- Docker
+- Docker Compose
+
+### Setup
+
+1. **Configure secrets**
+
+   Create a `secrets.env` file in the project root:
+
+   ```env
+   AIS_API_KEY=your_actual_api_key
+   MMSI_TO_TRACK=123456789
+   ```
+
+### Running with Docker
+
+```bash
+# Build and start the container
+docker-compose up -d
+
+# View logs
+docker-compose logs -f
+
+# Stop the container
+docker-compose down
+```
+
+### Sharing Data with Other Applications
+
+The ship location data is stored in a Docker volume named `braveheart_ship-data`. Other containers can mount this volume to access the data:
+
+```yaml
+services:
+  my-app:
+    image: my-app
+    volumes:
+      - braveheart_ship-data:/app/data
+```
+
+Or directly with Docker:
+
+```bash
+docker run -v braveheart_ship-data:/app/data my-app
+```
+
+The data file is located at `/app/data/ship_locations.json` inside the container.
 
 ```json
 [
