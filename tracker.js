@@ -30,14 +30,14 @@ function loadSecrets() {
 const secrets = loadSecrets();
 const API_KEY = secrets.AIS_API_KEY;
 const MMSI_TO_TRACK = secrets.MMSI_TO_TRACK;
-const OUTPUT_FILE = path.join("data", "ship_locations.json");
+const OUTPUT_FILE = () => path.join("data", `${MMSI_TO_TRACK}_locations.json`);
 
 // Global array to store location data
 let locationData = [];
 
 // Load existing data if file exists
 function loadExistingData() {
-  const filePath = path.join(__dirname, OUTPUT_FILE);
+  const filePath = path.join(__dirname, OUTPUT_FILE());
   if (fs.existsSync(filePath)) {
     try {
       const data = fs.readFileSync(filePath, "utf8");
@@ -52,7 +52,7 @@ function loadExistingData() {
 
 // Save data to JSON file
 function saveData() {
-  const filePath = path.join(__dirname, OUTPUT_FILE);
+  const filePath = path.join(__dirname, OUTPUT_FILE());
   try {
     fs.writeFileSync(filePath, JSON.stringify(locationData, null, 2));
     console.log(`Saved ${locationData.length} records to ${OUTPUT_FILE}`);
@@ -192,7 +192,7 @@ process.on("SIGTERM", function () {
 // Main
 console.log("=== Ship Tracker by MMSI ===");
 console.log(`Target MMSI: ${MMSI_TO_TRACK}`);
-console.log(`Output file: ${OUTPUT_FILE}`);
+console.log(`Output file: ${OUTPUT_FILE()}`);
 console.log("");
 
 loadExistingData();
