@@ -1,5 +1,7 @@
 # Ship Tracker
 
+> Version: 0.1.0
+
 Track a ship's location by MMSI using the AISStream websocket API.
 
 ## Prerequisites

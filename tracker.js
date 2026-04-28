@@ -1,9 +1,10 @@
 const WebSocket = require("ws");
-const fs = require("fs");
 const path = require("path");
+const { JsonStorage } = require("./src/storage");
 
 // Load secrets from .env file
 function loadSecrets() {
+  const fs = require("fs");
   const secretsPath = path.join(__dirname, "secrets.env");
   if (!fs.existsSync(secretsPath)) {
     console.error("Error: secrets.env file not found!");
@@ -30,36 +31,9 @@ function loadSecrets() {
 const secrets = loadSecrets();
 const API_KEY = secrets.AIS_API_KEY;
 const MMSI_TO_TRACK = secrets.MMSI_TO_TRACK;
-const OUTPUT_FILE = () => path.join("data", `${MMSI_TO_TRACK}_locations.json`);
 
-// Global array to store location data
-let locationData = [];
-
-// Load existing data if file exists
-function loadExistingData() {
-  const filePath = path.join(__dirname, OUTPUT_FILE());
-  if (fs.existsSync(filePath)) {
-    try {
-      const data = fs.readFileSync(filePath, "utf8");
-      locationData = JSON.parse(data);
-      console.log(`Loaded ${locationData.length} existing location records`);
-    } catch (err) {
-      console.error("Error loading existing data:", err.message);
-      locationData = [];
-    }
-  }
-}
-
-// Save data to JSON file
-function saveData() {
-  const filePath = path.join(__dirname, OUTPUT_FILE());
-  try {
-    fs.writeFileSync(filePath, JSON.stringify(locationData, null, 2));
-    console.log(`Saved ${locationData.length} records to ${OUTPUT_FILE}`);
-  } catch (err) {
-    console.error("Error saving data:", err.message);
-  }
-}
+// Initialize storage
+const storage = new JsonStorage(MMSI_TO_TRACK);
 
 // Extract relevant data from AIS message
 function extractLocationData(message) {
@@ -154,11 +128,8 @@ function connect() {
           `[${location.time_utc}] SOG: ${location.sog} kn, COG: ${location.cog}°, Lat: ${location.latitude}, Lon: ${location.longitude}`,
         );
 
-        // Add to our data array
-        locationData.push(location);
-
-        // Save immediately after receiving each location
-        saveData();
+        // Add to storage
+        storage.add(location);
       }
     } catch (err) {
       console.error("Error parsing message:", err.message);
@@ -167,8 +138,7 @@ function connect() {
 
   ws.on("close", function close() {
     console.log("Disconnected from AISStream");
-    // Save data before exiting
-    saveData();
+    storage.close();
   });
 
   ws.on("error", function error(err) {
@@ -179,21 +149,31 @@ function connect() {
 // Handle graceful shutdown
 process.on("SIGINT", function () {
   console.log("\nShutting down...");
-  saveData();
+  storage.close();
   process.exit(0);
 });
 
 process.on("SIGTERM", function () {
   console.log("\nShutting down...");
-  saveData();
+  storage.close();
   process.exit(0);
 });
 
 // Main
-console.log("=== Ship Tracker by MMSI ===");
-console.log(`Target MMSI: ${MMSI_TO_TRACK}`);
-console.log(`Output file: ${OUTPUT_FILE()}`);
-console.log("");
+async function main() {
+  console.log("=== Ship Tracker by MMSI ===");
+  console.log(`Target MMSI: ${MMSI_TO_TRACK}`);
+  console.log(`Output file: ${storage.filePath}`);
+  console.log("");
 
-loadExistingData();
-connect();
+  // Initialize storage
+  await storage.init();
+
+  // Load existing data
+  await storage.load();
+
+  // Start tracking
+  connect();
+}
+
+main();
