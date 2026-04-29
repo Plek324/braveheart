@@ -16,8 +16,12 @@ COPY . .
 # Create data directory
 RUN mkdir -p data
 
-# Expose port (if the app exposes any)
-# EXPOSE 3000
+# Copy start script and make it executable
+COPY start.sh .
+RUN chmod +x start.sh
+
+# Expose port for server (if needed)
+EXPOSE 3000
 
 # Default command
-CMD ["node", "tracker.js"]
+CMD ["sh", "start.sh"]
