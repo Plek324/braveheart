@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Shiptracker</title>
+    <link rel="stylesheet" href="styles.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
+    <link rel="stylesheet" href="leaflet-map.css" />
+  </head>
+  <body>
+    <header>
+      <h1>Shiptracker</h1>
+    </header>
+
+    <main>
+      <aside class="sidebar">
+        <div class="control-group">
+          <label for="ship-select">Ship (MMSI)</label>
+          <select id="ship-select">
+            <option value="">Select a ship...</option>
+          </select>
+        </div>
+
+        <div class="control-group">
+          <label for="year-select">Year</label>
+          <select id="year-select">
+            <option value="">Select a year...</option>
+          </select>
+        </div>
+
+        <div class="calendar-container">
+          <div class="calendar-header">
+            <button id="prev-month">&lt;</button>
+            <span id="month-year"></span>
+            <button id="next-month">&gt;</button>
+          </div>
+          <div class="calendar-weekdays">
+            <span>Su</span><span>Mo</span><span>Tu</span><span>We</span
+            ><span>Th</span><span>Fr</span><span>Sa</span>
+          </div>
+          <div class="calendar-days" id="calendar-days"></div>
+        </div>
+      </aside>
+
+      <section class="content">
+        <div id="track-info">
+          <p>Select a ship and a date to view the track.</p>
+        </div>
+        <div id="map" style="display:none;"></div>
+      </section>
+    </main>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+    <script src="app.js"></script>
+  </body>
+</html>
