@@ -122,6 +122,11 @@ const calendarDays = document.getElementById("calendar-days");
 const prevMonthBtn = document.getElementById("prev-month");
 const nextMonthBtn = document.getElementById("next-month");
 const trackInfo = document.getElementById("track-info");
+const refreshIndicator = document.getElementById("refresh-indicator");
+
+let nextRefreshAt = null;
+let lastRefreshAt = null;
+let refreshCountdownTimer = null;
 
 // Initialize
 async function init() {
@@ -200,6 +205,236 @@ function populateYearSelect() {
       yearSelect.appendChild(option);
     });
 }
+
+let currentTrackMeta = null;
+
+function getDisplayDate(trackMeta) {
+  if (!trackMeta) return "-";
+  return `${trackMeta.year}-${trackMeta.monthDay.slice(0, 2)}-${trackMeta.monthDay.slice(2)}`;
+}
+
+function renderTrackOnMap(points, trackMeta) {
+  if (!trackMeta) return;
+
+  const distanceMeters = calculateTrackDistance(points);
+  const distanceKm = (distanceMeters / 1000).toFixed(2);
+  const distanceNm = (distanceMeters / 1852).toFixed(2);
+  const sailingTimes = calculateSailingTimes(points);
+  const startTimeStr = formatTime(sailingTimes.startTime);
+  const endTimeStr = formatTime(sailingTimes.endTime);
+  const durationStr = formatDuration(sailingTimes.totalSailingMs);
+
+  const isCurrentDay = (() => {
+    const now = new Date();
+    const trackDate = new Date(
+      trackMeta.year,
+      parseInt(trackMeta.monthDay.slice(0, 2), 10) - 1,
+      parseInt(trackMeta.monthDay.slice(2), 10),
+    );
+    return (
+      trackDate.getFullYear() === now.getFullYear() &&
+      trackDate.getMonth() === now.getMonth() &&
+      trackDate.getDate() === now.getDate()
+    );
+  })();
+
+  const isStillMoving = (() => {
+    if (!isCurrentDay || !sailingTimes.endTime) return false;
+    const now = new Date();
+    const diffMs = now.getTime() - sailingTimes.endTime.getTime();
+    return diffMs >= 0 && diffMs <= 10 * 60 * 1000;
+  })();
+
+  let timeSegment = "";
+  if (startTimeStr !== "-") {
+    timeSegment = `from ${startTimeStr}`;
+    if (!isStillMoving && endTimeStr !== "-") {
+      timeSegment += ` till ${endTimeStr}`;
+    }
+  }
+
+  trackInfo.innerHTML = `<h2>Track for ${trackMeta.mmsi} on ${getDisplayDate(trackMeta)}</h2>
+    <p>Travelled: <b>${distanceKm} km</b> (<b>${distanceNm} nm</b>)${timeSegment ? ` ${timeSegment}` : ""} total <b>${durationStr}</b></p>`;
+
+  let mapDiv = document.getElementById("map");
+  mapDiv.style.display = "block";
+  lastRefreshAt = new Date();
+  nextRefreshAt = new Date(lastRefreshAt.getTime() + 120000);
+  updateRefreshIndicator();
+  if (!window._leafletMap) {
+    window._leafletMap = L.map("map");
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      maxZoom: 19,
+      attribution: "© OpenStreetMap contributors",
+    }).addTo(window._leafletMap);
+  }
+  let map = window._leafletMap;
+
+  if (window._trackLayer) {
+    map.removeLayer(window._trackLayer);
+  }
+  if (window._pointCircles) {
+    map.removeLayer(window._pointCircles);
+  }
+
+  const latlngs = Array.isArray(points)
+    ? points
+        .map((p) => [p.latitude, p.longitude])
+        .filter(([lat, lng]) => lat && lng)
+    : [];
+
+  if (latlngs.length > 0) {
+    window._trackLayer = L.polyline(latlngs, {
+      color: "blue",
+      weight: 4,
+    }).addTo(map);
+
+    window._pointCircles = L.layerGroup().addTo(map);
+    const circleRadius = 25;
+    const minZoomForCircles = 15;
+
+    const destinationPoint = (lat, lon, bearing, distance) => {
+      const R = 6371000;
+      const brng = (bearing * Math.PI) / 180;
+      const lat1 = (lat * Math.PI) / 180;
+      const lon1 = (lon * Math.PI) / 180;
+      const d = distance;
+
+      const lat2 = Math.asin(
+        Math.sin(lat1) * Math.cos(d / R) +
+          Math.cos(lat1) * Math.sin(d / R) * Math.cos(brng),
+      );
+      const lon2 =
+        lon1 +
+        Math.atan2(
+          Math.sin(brng) * Math.sin(d / R) * Math.cos(lat1),
+          Math.cos(d / R) - Math.sin(lat1) * Math.sin(lat2),
+        );
+
+      return [(lat2 * 180) / Math.PI, (lon2 * 180) / Math.PI];
+    };
+
+    const createArrowIcon = (cog) => {
+      return L.divIcon({
+        className: "arrow-marker",
+        html: `<svg width="20" height="20" viewBox="0 0 20 20" style="transform: rotate(${cog}deg);">
+                  <polygon points="10,0 16,16 10,12 4,16" fill="#4169E1" stroke="white" stroke-width="1"/>
+                </svg>`,
+        iconSize: [20, 20],
+        iconAnchor: [10, 10],
+      });
+    };
+
+    const createCompassNeedle = (heading) => {
+      return L.divIcon({
+        className: "compass-marker",
+        html: `<svg width="16" height="16" viewBox="0 0 16 16" style="transform: rotate(${heading}deg);">
+                  <polygon points="8,0 12,8 8,8 4,8" fill="#CC0000"/>
+                  <polygon points="8,16 12,8 8,8 4,8" fill="#FFFFFF"/>
+                </svg>`,
+        iconSize: [16, 16],
+        iconAnchor: [8, 8],
+      });
+    };
+
+    points.forEach((p) => {
+      if (p.latitude && p.longitude) {
+        L.circle([p.latitude, p.longitude], {
+          radius: circleRadius,
+          color: "#9370DB",
+          fillColor: "#9370DB",
+          fillOpacity: 0.5,
+          weight: 2,
+        }).addTo(window._pointCircles);
+
+        if (p.heading != null && p.heading >= 0 && p.heading <= 360) {
+          L.marker([p.latitude, p.longitude], {
+            icon: createCompassNeedle(p.heading),
+          }).addTo(window._pointCircles);
+        }
+
+        if (p.cog != null) {
+          const arrowPos = destinationPoint(
+            p.latitude,
+            p.longitude,
+            p.cog,
+            circleRadius,
+          );
+          L.marker(arrowPos, {
+            icon: createArrowIcon(p.cog),
+          }).addTo(window._pointCircles);
+        }
+      }
+    });
+
+    const updateCircleVisibility = () => {
+      if (window._pointCircles) {
+        if (map.getZoom() >= minZoomForCircles) {
+          window._pointCircles.addTo(map);
+        } else {
+          map.removeLayer(window._pointCircles);
+        }
+      }
+    };
+    if (window._pointCircleZoomHandler) {
+      map.off("zoomend", window._pointCircleZoomHandler);
+    }
+    window._pointCircleZoomHandler = updateCircleVisibility;
+    map.on("zoomend", window._pointCircleZoomHandler);
+    updateCircleVisibility();
+
+    map.fitBounds(window._trackLayer.getBounds(), {
+      padding: [20, 20],
+    });
+  } else {
+    mapDiv.style.display = "none";
+  }
+}
+
+function updateRefreshIndicator() {
+  if (!currentTrackMeta?.filename) {
+    refreshIndicator.textContent =
+      "Auto-refresh is idle until a track is selected.";
+    return;
+  }
+
+  const lastRefresh = lastRefreshAt || new Date();
+  const nextRefresh = nextRefreshAt || new Date(lastRefresh.getTime() + 120000);
+  const now = new Date();
+  const remainingMs = Math.max(0, nextRefresh - now);
+  const remainingSeconds = Math.ceil(remainingMs / 1000);
+  const minutes = Math.floor(remainingSeconds / 60);
+  const seconds = remainingSeconds % 60;
+  const paddedSeconds = String(seconds).padStart(2, "0");
+
+  refreshIndicator.textContent = `Last refreshed: ${lastRefresh.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}. Next refresh in ${minutes}:${paddedSeconds}.`;
+}
+
+async function refreshCurrentTrack() {
+  if (!currentTrackMeta?.filename) return;
+
+  try {
+    const resp = await fetch(`/api/track/${currentTrackMeta.filename}`);
+    if (!resp.ok) throw new Error("Failed to refresh track");
+    const points = await resp.json();
+    renderTrackOnMap(points, currentTrackMeta);
+    nextRefreshAt = new Date(Date.now() + 120000);
+    updateRefreshIndicator();
+  } catch (err) {
+    console.error("Auto-refresh failed:", err);
+    refreshIndicator.textContent = `Auto-refresh failed at ${new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}.`;
+  }
+}
+
+function startRefreshCountdown() {
+  if (refreshCountdownTimer) {
+    clearInterval(refreshCountdownTimer);
+  }
+  refreshCountdownTimer = setInterval(updateRefreshIndicator, 1000);
+}
+
+setInterval(refreshCurrentTrack, 120000);
+startRefreshCountdown();
 
 // Get tracks for selected ship
 function getTracksForShip(mmsi) {
@@ -287,160 +522,15 @@ function renderCalendar() {
             const resp = await fetch(`/api/track/${track.filename}`);
             if (!resp.ok) throw new Error("Failed to load track");
             const points = await resp.json();
-            const distanceMeters = calculateTrackDistance(points);
-            const distanceKm = (distanceMeters / 1000).toFixed(2);
-            const distanceNm = (distanceMeters / 1852).toFixed(2); // 1 nautical mile = 1852 meters
 
-            const sailingTimes = calculateSailingTimes(points);
-            const startTimeStr = formatTime(sailingTimes.startTime);
-            const endTimeStr = formatTime(sailingTimes.endTime);
-            const durationStr = formatDuration(sailingTimes.totalSailingMs);
+            currentTrackMeta = {
+              filename: track.filename,
+              mmsi: selectedMmsi,
+              year: selectedYear,
+              monthDay,
+            };
 
-            trackInfo.innerHTML = `<h2>Track for ${selectedMmsi} on ${selectedYear}-${monthDay.slice(0, 2)}-${monthDay.slice(2)}</h2>
-              <p>Distance travelled: <b>${distanceKm} km</b> (<b>${distanceNm} nm</b>)</p>
-              <p>Started moving: <b>${startTimeStr}</b> | Stopped moving: <b>${endTimeStr}</b></p>
-              <p>Total time sailing: <b>${durationStr}</b></p>`;
-
-            // Show map
-            let mapDiv = document.getElementById("map");
-            mapDiv.style.display = "block";
-            if (!window._leafletMap) {
-              window._leafletMap = L.map("map");
-              L.tileLayer(
-                "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
-                {
-                  maxZoom: 19,
-                  attribution: "© OpenStreetMap contributors",
-                },
-              ).addTo(window._leafletMap);
-            }
-            let map = window._leafletMap;
-
-            // Remove old layers
-            if (window._trackLayer) {
-              map.removeLayer(window._trackLayer);
-            }
-            if (window._pointCircles) {
-              map.removeLayer(window._pointCircles);
-            }
-
-            // Extract lat/lngs
-            const latlngs = Array.isArray(points)
-              ? points
-                  .map((p) => [p.latitude, p.longitude])
-                  .filter(([lat, lng]) => lat && lng)
-              : [];
-
-            if (latlngs.length > 0) {
-              window._trackLayer = L.polyline(latlngs, {
-                color: "blue",
-                weight: 4,
-              }).addTo(map);
-
-              // Add circles at each point (only visible when zoomed in)
-              window._pointCircles = L.layerGroup().addTo(map);
-              const circleRadius = 25; // meters
-              const minZoomForCircles = 15;
-
-              // Calculate destination point given start, bearing, and distance
-              const destinationPoint = (lat, lon, bearing, distance) => {
-                const R = 6371000; // Earth radius in meters
-                const brng = (bearing * Math.PI) / 180;
-                const lat1 = (lat * Math.PI) / 180;
-                const lon1 = (lon * Math.PI) / 180;
-                const d = distance;
-
-                const lat2 = Math.asin(
-                  Math.sin(lat1) * Math.cos(d / R) +
-                    Math.cos(lat1) * Math.sin(d / R) * Math.cos(brng),
-                );
-                const lon2 =
-                  lon1 +
-                  Math.atan2(
-                    Math.sin(brng) * Math.sin(d / R) * Math.cos(lat1),
-                    Math.cos(d / R) - Math.sin(lat1) * Math.sin(lat2),
-                  );
-
-                return [(lat2 * 180) / Math.PI, (lon2 * 180) / Math.PI];
-              };
-
-              // Create arrow icon function
-              const createArrowIcon = (cog) => {
-                return L.divIcon({
-                  className: "arrow-marker",
-                  html: `<svg width="20" height="20" viewBox="0 0 20 20" style="transform: rotate(${cog}deg);">
-                    <polygon points="10,0 16,16 10,12 4,16" fill="#4169E1" stroke="white" stroke-width="1"/>
-                  </svg>`,
-                  iconSize: [20, 20],
-                  iconAnchor: [10, 10],
-                });
-              };
-
-              // Create compass needle icon (half red, half white)
-              const createCompassNeedle = (heading) => {
-                return L.divIcon({
-                  className: "compass-marker",
-                  html: `<svg width="16" height="16" viewBox="0 0 16 16" style="transform: rotate(${heading}deg);">
-                    <polygon points="8,0 12,8 8,8 4,8" fill="#CC0000"/>
-                    <polygon points="8,16 12,8 8,8 4,8" fill="#FFFFFF"/>
-                  </svg>`,
-                  iconSize: [16, 16],
-                  iconAnchor: [8, 8],
-                });
-              };
-
-              points.forEach((p) => {
-                if (p.latitude && p.longitude) {
-                  // Circle
-                  L.circle([p.latitude, p.longitude], {
-                    radius: circleRadius,
-                    color: "#9370DB",
-                    fillColor: "#9370DB",
-                    fillOpacity: 0.5,
-                    weight: 2,
-                  }).addTo(window._pointCircles);
-
-                  // Compass needle pointing in heading direction (if valid 0-360)
-                  if (p.heading != null && p.heading >= 0 && p.heading <= 360) {
-                    L.marker([p.latitude, p.longitude], {
-                      icon: createCompassNeedle(p.heading),
-                    }).addTo(window._pointCircles);
-                  }
-
-                  // Arrow pointing in COG direction, placed on edge of circle
-                  if (p.cog != null) {
-                    const arrowPos = destinationPoint(
-                      p.latitude,
-                      p.longitude,
-                      p.cog,
-                      circleRadius,
-                    );
-                    L.marker(arrowPos, {
-                      icon: createArrowIcon(p.cog),
-                    }).addTo(window._pointCircles);
-                  }
-                }
-              });
-
-              // Show/hide circles based on zoom level
-              const updateCircleVisibility = () => {
-                if (window._pointCircles) {
-                  if (map.getZoom() >= minZoomForCircles) {
-                    window._pointCircles.addTo(map);
-                  } else {
-                    map.removeLayer(window._pointCircles);
-                  }
-                }
-              };
-              map.on("zoomend", updateCircleVisibility);
-              updateCircleVisibility();
-
-              map.fitBounds(window._trackLayer.getBounds(), {
-                padding: [20, 20],
-              });
-            } else {
-              mapDiv.style.display = "none";
-            }
+            renderTrackOnMap(points, currentTrackMeta);
           } catch (err) {
             trackInfo.innerHTML = `<p style='color:red'>Error loading track: ${err.message}</p>`;
             let mapDiv = document.getElementById("map");

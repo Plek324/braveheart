@@ -92,8 +92,8 @@ function connect() {
       // The ship could be anywhere, so we use the whole world
       BoundingBoxes: [
         [
-          [-90, -180],
-          [90, 180],
+          [40, -20],
+          [65, 3180],
         ],
       ],
       // Filter by specific MMSI

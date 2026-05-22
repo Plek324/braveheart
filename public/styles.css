@@ -148,7 +148,19 @@ main {
 #track-info {
   text-align: center;
   color: #888;
-  padding: 2rem;
+  padding: 1rem 1rem 0.5rem;
+}
+
+#track-info h2 {
+  margin-top: 0;
+}
+
+#track-info p {
+  margin: 0.25rem 0;
+}
+
+#refresh-indicator {
+  margin-bottom: 0.25rem;
 }
 
 /* Tablet and desktop */
