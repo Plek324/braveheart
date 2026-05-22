@@ -140,6 +140,8 @@ main {
 }
 
 .content {
+  display: flex;
+  flex-direction: column;
   flex: 1;
   padding: 1rem;
   background-color: white;
@@ -149,6 +151,13 @@ main {
   text-align: center;
   color: #888;
   padding: 1rem 1rem 0.5rem;
+}
+
+#map {
+  flex: 1;
+  min-height: 60vh;
+  border-radius: 8px;
+  overflow: hidden;
 }
 
 #track-info h2 {
