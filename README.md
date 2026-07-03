@@ -35,11 +35,54 @@ Track a ship's location by MMSI using the AISStream websocket API.
 
 ## Usage
 
+The project uses two separate entry points:
+
+- `npm start` starts the AIS tracker backend (`tracker.js`).
+- `npm run server` starts the frontend server (`server.js`).
+
 ```bash
 npm start
 ```
 
+Then in another terminal:
+
+```bash
+npm run server
+```
+
 The tracker will connect to AISStream and begin recording location data. Each position update is saved immediately to `ship_locations.json`.
+
+## Release
+
+This project uses the version in `package.json` as the canonical release version.
+
+To perform a release:
+
+```bash
+npm run release -- patch
+```
+
+This will:
+
+- bump `package.json` version (patch/ minor/ major or explicit version)
+- build Docker images tagged as:
+  - `braveheart:<version>`
+  - `plek243/braveheart:<version>`
+  - `plek243/braveheart:latest`
+- push the Docker images to Docker Hub
+- push the git commit and tag
+
+If you want to build locally without pushing:
+
+```bash
+npm run release -- patch --no-push --no-git-push
+```
+
+To build and push the current version without changing `package.json`:
+
+```bash
+npm run release -- current
+```
 
 ## Docker
 
