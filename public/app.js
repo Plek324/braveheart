@@ -299,8 +299,14 @@ function renderTrackOnMap(points, trackMeta) {
 
   const latlngs = Array.isArray(points)
     ? points
-        .map((p) => [p.latitude, p.longitude])
-        .filter(([lat, lng]) => lat && lng)
+        .map((p) => [Number(p.latitude), Number(p.longitude)])
+        .filter(
+          ([lat, lng]) =>
+            typeof lat === "number" &&
+            typeof lng === "number" &&
+            !Number.isNaN(lat) &&
+            !Number.isNaN(lng),
+        )
     : [];
 
   if (latlngs.length > 0) {
@@ -308,10 +314,25 @@ function renderTrackOnMap(points, trackMeta) {
       color: "blue",
       weight: 4,
     }).addTo(map);
+    map.invalidateSize();
 
     window._pointCircles = L.layerGroup().addTo(map);
     const circleRadius = 25;
     const minZoomForCircles = 15;
+
+    const trackBounds = window._trackLayer.getBounds();
+    try {
+      if (trackBounds.isValid()) {
+        map.fitBounds(trackBounds, { padding: [20, 20] });
+      } else if (latlngs.length > 0) {
+        map.setView(latlngs[0], 13);
+      }
+    } catch (err) {
+      console.warn("Leaflet fitBounds failed, falling back to setView:", err);
+      if (latlngs.length > 0) {
+        map.setView(latlngs[0], 13);
+      }
+    }
 
     const destinationPoint = (lat, lon, bearing, distance) => {
       const R = 6371000;
@@ -402,10 +423,6 @@ function renderTrackOnMap(points, trackMeta) {
     window._pointCircleZoomHandler = updateCircleVisibility;
     map.on("zoomend", window._pointCircleZoomHandler);
     updateCircleVisibility();
-
-    map.fitBounds(window._trackLayer.getBounds(), {
-      padding: [20, 20],
-    });
   } else {
     mapDiv.style.display = "none";
   }
