@@ -14,6 +14,9 @@ const MIME_TYPES = {
   ".jpg": "image/jpeg",
 };
 
+function isValidTrackFilename(name) {
+  return /^\d+(?:_\d{6})?_locations\.json$/.test(name);
+}
 function getAvailableTracks() {
   const files = fs.readdirSync(DATA_DIR);
   const tracks = [];
@@ -45,38 +48,77 @@ const server = http.createServer((req, res) => {
     const mmsis = getUniqueMmsis(tracks);
     res.writeHead(200, { "Content-Type": "application/json" });
     res.end(JSON.stringify({ tracks, mmsis }));
+    console.log(
+      `${req.method} ${req.url} 200 ${req.socket.remoteAddress} ${req.headers["user-agent"] || ""}`,
+    );
     return;
   }
 
   // API: Get specific track data
   if (req.url.startsWith("/api/track/")) {
-    const filename = req.url.replace("/api/track/", "");
+    let filename = req.url.replace("/api/track/", "");
+    try {
+      filename = decodeURIComponent(filename);
+    } catch (e) {}
+
+    if (!isValidTrackFilename(filename)) {
+      res.writeHead(400, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "Invalid track filename" }));
+      console.log(
+        `${req.method} ${req.url} 400 ${req.socket.remoteAddress} ${req.headers["user-agent"] || ""}`,
+      );
+      return;
+    }
+
     const filepath = path.join(DATA_DIR, filename);
 
-    if (fs.existsSync(filepath)) {
+    if (fs.existsSync(filepath) && fs.statSync(filepath).isFile()) {
       const content = fs.readFileSync(filepath, "utf8");
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(content);
+      console.log(
+        `${req.method} ${req.url} 200 ${req.socket.remoteAddress} ${req.headers["user-agent"] || ""}`,
+      );
     } else {
       res.writeHead(404, { "Content-Type": "application/json" });
       res.end(JSON.stringify({ error: "Track not found" }));
+      console.log(
+        `${req.method} ${req.url} 404 ${req.socket.remoteAddress} ${req.headers["user-agent"] || ""}`,
+      );
     }
     return;
   }
 
   // Serve static files
   let filepath = req.url === "/" ? "/index.html" : req.url;
-  const fullPath = path.join(__dirname, "public", filepath);
-  const ext = path.extname(fullPath);
+  const publicDir = path.join(__dirname, "public");
+  const requested = path.join(publicDir, filepath);
+  const resolved = path.resolve(requested);
 
-  if (fs.existsSync(fullPath) && fs.statSync(fullPath).isFile()) {
+  if (!resolved.startsWith(path.resolve(publicDir))) {
+    res.writeHead(403);
+    res.end("Forbidden");
+    console.log(
+      `${req.method} ${req.url} 403 ${req.socket.remoteAddress} ${req.headers["user-agent"] || ""}`,
+    );
+    return;
+  }
+
+  const ext = path.extname(resolved);
+  if (fs.existsSync(resolved) && fs.statSync(resolved).isFile()) {
     res.writeHead(200, { "Content-Type": MIME_TYPES[ext] || "text/plain" });
-    res.end(fs.readFileSync(fullPath));
+    res.end(fs.readFileSync(resolved));
+    console.log(
+      `${req.method} ${req.url} 200 ${req.socket.remoteAddress} ${req.headers["user-agent"] || ""}`,
+    );
     return;
   }
 
   res.writeHead(404);
   res.end("Not found");
+  console.log(
+    `${req.method} ${req.url} 404 ${req.socket.remoteAddress} ${req.headers["user-agent"] || ""}`,
+  );
 });
 
 server.listen(PORT, () => {
