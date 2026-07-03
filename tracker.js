@@ -2,6 +2,51 @@ const WebSocket = require("ws");
 const path = require("path");
 const { JsonStorage } = require("./src/storage");
 
+let ws = null;
+let inactivityTimer = null;
+let reconnectTimer = null;
+const INACTIVITY_TIMEOUT_MS = 4 * 60 * 60 * 1000; // 4 hours
+const RECONNECT_DELAY_MS = 5000; // 5 seconds
+
+function resetInactivityTimer() {
+  if (inactivityTimer) {
+    clearTimeout(inactivityTimer);
+  }
+  inactivityTimer = setTimeout(() => {
+    console.warn("No AISStream data for 4 hours, restarting connection...");
+    restartConnection();
+  }, INACTIVITY_TIMEOUT_MS);
+}
+
+function clearInactivityTimer() {
+  if (inactivityTimer) {
+    clearTimeout(inactivityTimer);
+    inactivityTimer = null;
+  }
+}
+
+function scheduleReconnect() {
+  if (reconnectTimer) return;
+  reconnectTimer = setTimeout(() => {
+    reconnectTimer = null;
+    connect();
+  }, RECONNECT_DELAY_MS);
+}
+
+function restartConnection() {
+  clearInactivityTimer();
+  if (ws) {
+    try {
+      ws.removeAllListeners();
+      ws.terminate();
+    } catch (err) {
+      console.error("Error terminating AISStream socket:", err.message);
+    }
+    ws = null;
+  }
+  scheduleReconnect();
+}
+
 // Load secrets from .env file
 function loadSecrets() {
   const fs = require("fs");
@@ -78,12 +123,18 @@ function extractLocationData(message) {
 
 // Connect to AISStream
 function connect() {
+  if (ws) {
+    console.log("AISStream connection already exists, skipping connect");
+    return;
+  }
+
   console.log(`Connecting to AISStream to track MMSI: ${MMSI_TO_TRACK}`);
 
-  const ws = new WebSocket("wss://stream.aisstream.io/v0/stream");
+  ws = new WebSocket("wss://stream.aisstream.io/v0/stream");
 
   ws.on("open", function open() {
     console.log("Connected to AISStream");
+    resetInactivityTimer();
 
     // Send subscription message
     const subscriptionMessage = {
@@ -111,6 +162,7 @@ function connect() {
   });
 
   ws.on("message", function incoming(data) {
+    resetInactivityTimer();
     try {
       const message = JSON.parse(data);
 
@@ -136,13 +188,20 @@ function connect() {
     }
   });
 
-  ws.on("close", function close() {
-    console.log("Disconnected from AISStream");
-    storage.close();
+  ws.on("close", function close(code, reason) {
+    console.log(`Disconnected from AISStream (code=${code}, reason=${reason})`);
+    ws = null;
+    clearInactivityTimer();
+    scheduleReconnect();
   });
 
   ws.on("error", function error(err) {
     console.error("WebSocket error:", err.message);
+    clearInactivityTimer();
+    if (!ws || ws.readyState === WebSocket.CLOSING || ws.readyState === WebSocket.CLOSED) {
+      ws = null;
+      scheduleReconnect();
+    }
   });
 }
 
