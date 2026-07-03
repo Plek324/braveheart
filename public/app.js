@@ -213,6 +213,21 @@ function getDisplayDate(trackMeta) {
   return `${trackMeta.year}-${trackMeta.monthDay.slice(0, 2)}-${trackMeta.monthDay.slice(2)}`;
 }
 
+function isTrackForToday(trackMeta) {
+  if (!trackMeta) return false;
+  const now = new Date();
+  const trackDate = new Date(
+    trackMeta.year,
+    parseInt(trackMeta.monthDay.slice(0, 2), 10) - 1,
+    parseInt(trackMeta.monthDay.slice(2), 10),
+  );
+  return (
+    trackDate.getFullYear() === now.getFullYear() &&
+    trackDate.getMonth() === now.getMonth() &&
+    trackDate.getDate() === now.getDate()
+  );
+}
+
 function renderTrackOnMap(points, trackMeta) {
   if (!trackMeta) return;
 
@@ -258,8 +273,13 @@ function renderTrackOnMap(points, trackMeta) {
 
   let mapDiv = document.getElementById("map");
   mapDiv.style.display = "block";
-  lastRefreshAt = new Date();
-  nextRefreshAt = new Date(lastRefreshAt.getTime() + 120000);
+  if (isTrackForToday(trackMeta)) {
+    lastRefreshAt = new Date();
+    nextRefreshAt = new Date(lastRefreshAt.getTime() + 120000);
+  } else {
+    lastRefreshAt = null;
+    nextRefreshAt = null;
+  }
   updateRefreshIndicator();
   if (!window._leafletMap) {
     window._leafletMap = L.map("map");
@@ -398,20 +418,30 @@ function updateRefreshIndicator() {
     return;
   }
 
-  const lastRefresh = lastRefreshAt || new Date();
-  const nextRefresh = nextRefreshAt || new Date(lastRefresh.getTime() + 120000);
+  if (!isTrackForToday(currentTrackMeta)) {
+    refreshIndicator.textContent =
+      "Auto-refresh is disabled for the selected day.";
+    return;
+  }
+
+  if (!lastRefreshAt || !nextRefreshAt) {
+    refreshIndicator.textContent =
+      "Auto-refresh is preparing for today's track...";
+    return;
+  }
+
   const now = new Date();
-  const remainingMs = Math.max(0, nextRefresh - now);
+  const remainingMs = Math.max(0, nextRefreshAt - now);
   const remainingSeconds = Math.ceil(remainingMs / 1000);
   const minutes = Math.floor(remainingSeconds / 60);
   const seconds = remainingSeconds % 60;
   const paddedSeconds = String(seconds).padStart(2, "0");
 
-  refreshIndicator.textContent = `Last refreshed: ${lastRefresh.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}. Next refresh in ${minutes}:${paddedSeconds}.`;
+  refreshIndicator.textContent = `Last refreshed: ${lastRefreshAt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}. Next refresh in ${minutes}:${paddedSeconds}.`;
 }
 
 async function refreshCurrentTrack() {
-  if (!currentTrackMeta?.filename) return;
+  if (!currentTrackMeta?.filename || !isTrackForToday(currentTrackMeta)) return;
 
   try {
     const resp = await fetch(`/api/track/${currentTrackMeta.filename}`);
