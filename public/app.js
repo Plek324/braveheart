@@ -114,6 +114,46 @@ function formatTime(date) {
   });
 }
 
+function formatTooltipTime(point) {
+  if (!point?.time_utc) return "-";
+
+  const date = new Date(point.time_utc);
+  return date.toLocaleString("en-GB", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  });
+}
+
+function getNearestTrackPoint(latlng, points) {
+  if (!latlng || !Array.isArray(points) || points.length === 0) return null;
+
+  let nearestPoint = null;
+  let nearestDistance = Number.POSITIVE_INFINITY;
+
+  points.forEach((point) => {
+    if (point.latitude == null || point.longitude == null) return;
+
+    const distance = haversineDistance(
+      point.latitude,
+      point.longitude,
+      latlng.lat,
+      latlng.lng,
+    );
+
+    if (distance < nearestDistance) {
+      nearestDistance = distance;
+      nearestPoint = point;
+    }
+  });
+
+  return nearestPoint;
+}
+
 // DOM elements
 const shipSelect = document.getElementById("ship-select");
 const yearSelect = document.getElementById("year-select");
@@ -315,6 +355,30 @@ function renderTrackOnMap(points, trackMeta) {
       weight: 4,
     }).addTo(map);
     map.invalidateSize();
+
+    window._trackLayer.bindTooltip("Hover over the track", {
+      sticky: true,
+      direction: "top",
+      opacity: 0.9,
+    });
+
+    window._trackLayer.on("mousemove", (event) => {
+      const nearestPoint = getNearestTrackPoint(event.latlng, points);
+      const timeText = nearestPoint?.time_utc
+        ? formatTooltipTime(nearestPoint)
+        : "-";
+      const speedText =
+        nearestPoint?.sog != null ? `${nearestPoint.sog.toFixed(1)} kn` : "-";
+
+      window._trackLayer.setTooltipContent(
+        `<div><strong>${timeText}</strong><br/>Speed: ${speedText}</div>`,
+      );
+      window._trackLayer.openTooltip(event.latlng);
+    });
+
+    window._trackLayer.on("mouseout", () => {
+      window._trackLayer.closeTooltip();
+    });
 
     window._pointCircles = L.layerGroup().addTo(map);
     const circleRadius = 25;
