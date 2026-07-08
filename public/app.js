@@ -163,10 +163,14 @@ const prevMonthBtn = document.getElementById("prev-month");
 const nextMonthBtn = document.getElementById("next-month");
 const trackInfo = document.getElementById("track-info");
 const refreshIndicator = document.getElementById("refresh-indicator");
+const downloadGpxBtn = document.getElementById("download-gpx");
+const downloadAllTracksBtn = document.getElementById("download-all-tracks");
 
 let nextRefreshAt = null;
 let lastRefreshAt = null;
 let refreshCountdownTimer = null;
+let currentTrackPoints = [];
+let currentTrackMeta = null;
 
 // Initialize
 async function init() {
@@ -195,8 +199,13 @@ async function init() {
   }
   // Preselect current month
   currentMonth = new Date().getMonth();
+  downloadGpxBtn.addEventListener("click", downloadTrackAsGpx);
+  downloadAllTracksBtn.addEventListener("click", downloadAllTracksAsZip);
+  downloadGpxBtn.disabled = true;
+  downloadAllTracksBtn.disabled = true;
 
   renderCalendar();
+  updateDownloadButtonsState();
 }
 
 // Load tracks from API
@@ -206,6 +215,7 @@ async function loadTracks() {
     const data = await response.json();
     tracks = data.tracks;
     mmsis = data.mmsis;
+    updateDownloadButtonsState();
   } catch (err) {
     console.error("Error loading tracks:", err);
   }
@@ -246,8 +256,6 @@ function populateYearSelect() {
     });
 }
 
-let currentTrackMeta = null;
-
 function getDisplayDate(trackMeta) {
   if (!trackMeta) return "-";
   return `${trackMeta.year}-${trackMeta.monthDay.slice(0, 2)}-${trackMeta.monthDay.slice(2)}`;
@@ -268,9 +276,133 @@ function isTrackForToday(trackMeta) {
   );
 }
 
+function getTrackFileName(trackMeta) {
+  const trackName = trackMeta?.mmsi ? `ship-${trackMeta.mmsi}` : "track";
+  const trackDate =
+    trackMeta?.year && trackMeta?.monthDay
+      ? `${trackMeta.year}-${trackMeta.monthDay.slice(0, 2)}-${trackMeta.monthDay.slice(2)}`
+      : "track";
+  return `${trackName}-${trackDate}`.replace(/[^a-zA-Z0-9._-]/g, "_");
+}
+
+function buildGpxContent(points, trackMeta) {
+  const safeName = getTrackFileName(trackMeta);
+  const gpxTracks = (Array.isArray(points) ? points : [])
+    .filter((point) => point.latitude != null && point.longitude != null)
+    .map((point) => {
+      const timestamp = point.time_utc
+        ? new Date(point.time_utc).toISOString()
+        : null;
+      const lat = point.latitude;
+      const lon = point.longitude;
+      const ele = point.altitude ?? point.elevation ?? 0;
+      const speed = point.sog != null ? point.sog : 0;
+
+      return `<trkpt lat="${lat}" lon="${lon}">${
+        timestamp ? `<time>${timestamp}</time>` : ""
+      }<ele>${ele}</ele><extensions><speed>${speed}</speed></extensions></trkpt>`;
+    })
+    .join("");
+
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<gpx version="1.1" creator="Shiptracker" xmlns="http://www.topografix.com/GPX/1/1">
+  <metadata>
+    <name>${safeName}</name>
+  </metadata>
+  <trk>
+    <name>${safeName}</name>
+    <trkseg>
+      ${gpxTracks}
+    </trkseg>
+  </trk>
+</gpx>`;
+}
+
+function downloadBlob(blob, fileName) {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = fileName;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
+
+function downloadTrackAsGpx() {
+  if (!currentTrackPoints || currentTrackPoints.length === 0) {
+    return;
+  }
+
+  const safeName = getTrackFileName(currentTrackMeta);
+  const gpx = buildGpxContent(currentTrackPoints, currentTrackMeta);
+  const blob = new Blob([gpx], { type: "application/gpx+xml;charset=utf-8" });
+  downloadBlob(blob, `${safeName}.gpx`);
+}
+
+function getTracksForSelection() {
+  if (!selectedMmsi || !selectedYear) return [];
+
+  return tracks.filter((track) => {
+    if (track.mmsi !== selectedMmsi || !track.date) return false;
+    const trackYear = 2000 + parseInt(track.date.substring(0, 2));
+    return trackYear === selectedYear;
+  });
+}
+
+function updateDownloadButtonsState() {
+  const hasCurrentTrack = currentTrackPoints.length > 0;
+  downloadGpxBtn.disabled = !hasCurrentTrack;
+
+  const matchingTracks = getTracksForSelection();
+  downloadAllTracksBtn.disabled =
+    !selectedMmsi || !selectedYear || matchingTracks.length === 0;
+}
+
+async function downloadAllTracksAsZip() {
+  if (!selectedMmsi || !selectedYear) return;
+
+  const matchingTracks = getTracksForSelection();
+  if (matchingTracks.length === 0) return;
+
+  downloadAllTracksBtn.disabled = true;
+  downloadAllTracksBtn.textContent = "Preparing...";
+
+  try {
+    const zip = new JSZip();
+
+    for (const track of matchingTracks) {
+      try {
+        const resp = await fetch(`/api/track/${track.filename}`);
+        if (!resp.ok) throw new Error(`Failed to load ${track.filename}`);
+        const points = await resp.json();
+        const monthDay = track.date.substring(2);
+        const trackMeta = {
+          filename: track.filename,
+          mmsi: track.mmsi,
+          year: selectedYear,
+          monthDay,
+        };
+        zip.file(`${getTrackFileName(trackMeta)}.gpx`, buildGpxContent(points, trackMeta));
+      } catch (err) {
+        console.error("Error exporting track to ZIP:", err);
+      }
+    }
+
+    const zipBlob = await zip.generateAsync({ type: "blob" });
+    downloadBlob(zipBlob, `${selectedMmsi}-${selectedYear}-tracks.zip`);
+  } finally {
+    downloadAllTracksBtn.textContent = "Download all tracks";
+    updateDownloadButtonsState();
+  }
+}
+
 function renderTrackOnMap(points, trackMeta) {
   if (!trackMeta) return;
 
+  currentTrackPoints = Array.isArray(points) ? points : [];
+  downloadGpxBtn.disabled = currentTrackPoints.length === 0;
+  currentTrackMeta = trackMeta;
   const distanceMeters = calculateTrackDistance(points);
   const distanceKm = (distanceMeters / 1000).toFixed(2);
   const distanceNm = (distanceMeters / 1852).toFixed(2);
@@ -654,6 +786,8 @@ function renderCalendar() {
     calendarDays.appendChild(dayEl);
   }
 
+  updateDownloadButtonsState();
+
   // Next month days
   const totalCells = firstDay + daysInMonth;
   const remainingCells = 7 - (totalCells % 7);
@@ -671,6 +805,7 @@ function renderCalendar() {
 shipSelect.addEventListener("change", (e) => {
   selectedMmsi = e.target.value || null;
   renderCalendar();
+  updateDownloadButtonsState();
 });
 
 yearSelect.addEventListener("change", (e) => {
@@ -680,6 +815,7 @@ yearSelect.addEventListener("change", (e) => {
     currentMonth = 0;
   }
   renderCalendar();
+  updateDownloadButtonsState();
 });
 
 prevMonthBtn.addEventListener("click", () => {
