@@ -172,6 +172,14 @@ main {
   margin-bottom: 0.25rem;
 }
 
+.sidebar-actions {
+  margin-top: 1rem;
+}
+
+.sidebar-btn {
+  width: 100%;
+}
+
 .track-toolbar {
   display: flex;
   justify-content: flex-end;

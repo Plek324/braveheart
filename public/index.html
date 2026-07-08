@@ -46,6 +46,16 @@
           </div>
           <div class="calendar-days" id="calendar-days"></div>
         </div>
+
+        <div class="sidebar-actions">
+          <button
+            id="download-all-tracks"
+            class="download-gpx-btn sidebar-btn"
+            type="button"
+          >
+            Download all tracks
+          </button>
+        </div>
       </aside>
 
       <section class="content">
@@ -68,6 +78,7 @@
       src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
       crossorigin=""
     ></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <script src="app.js"></script>
   </body>
 </html>

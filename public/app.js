@@ -383,7 +383,10 @@ async function downloadAllTracksAsZip() {
           year: selectedYear,
           monthDay,
         };
-        zip.file(`${getTrackFileName(trackMeta)}.gpx`, buildGpxContent(points, trackMeta));
+        zip.file(
+          `${getTrackFileName(trackMeta)}.gpx`,
+          buildGpxContent(points, trackMeta),
+        );
       } catch (err) {
         console.error("Error exporting track to ZIP:", err);
       }
