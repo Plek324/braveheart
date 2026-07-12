@@ -68,7 +68,7 @@ function calculateSailingTimes(points) {
     if (point.latitude == null || point.longitude == null) continue;
 
     // Parse time_utc string to timestamp
-    const timestamp = point.time_utc ? new Date(point.time_utc) : null;
+    const timestamp = parseTrackTimestamp(point.time_utc);
 
     if (prevLat !== null && prevLon !== null && prevTimestamp && timestamp) {
       const dist = haversineDistance(
@@ -114,10 +114,65 @@ function formatTime(date) {
   });
 }
 
+function parseTrackTimestamp(value) {
+  if (!value) return null;
+
+  if (value instanceof Date) {
+    return Number.isNaN(value.getTime()) ? null : value;
+  }
+
+  if (typeof value === "number") {
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? null : date;
+  }
+
+  if (typeof value !== "string") return null;
+
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+
+  const directDate = new Date(trimmed);
+  if (!Number.isNaN(directDate.getTime())) {
+    return directDate;
+  }
+
+  const match = trimmed.match(
+    /^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2}):(\d{2})(?:\.(\d+))?(?:\s+([+-]\d{2})(\d{2})\s*(UTC|GMT))?$/i,
+  );
+
+  if (!match) {
+    return null;
+  }
+
+  const [
+    ,
+    year,
+    month,
+    day,
+    hour,
+    minute,
+    second,
+    fractional,
+    offsetHours,
+    offsetMinutes,
+  ] = match;
+  const fractionalPart = fractional ? `.${fractional}` : "";
+  const offset =
+    offsetHours && offsetMinutes
+      ? `${offsetHours.startsWith("+") || offsetHours.startsWith("-") ? offsetHours : `+${offsetHours}`}:${offsetMinutes}`
+      : "Z";
+
+  const normalized = `${year}-${month}-${day}T${hour}:${minute}:${second}${fractionalPart}${offset === "Z" ? "Z" : offset}`;
+  const parsed = new Date(normalized);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
 function formatTooltipTime(point) {
   if (!point?.time_utc) return "-";
 
-  const date = new Date(point.time_utc);
+  const date = parseTrackTimestamp(point.time_utc);
+  if (!date) return "-";
+
   return date.toLocaleString("en-GB", {
     day: "2-digit",
     month: "2-digit",
@@ -290,9 +345,8 @@ function buildGpxContent(points, trackMeta) {
   const gpxTracks = (Array.isArray(points) ? points : [])
     .filter((point) => point.latitude != null && point.longitude != null)
     .map((point) => {
-      const timestamp = point.time_utc
-        ? new Date(point.time_utc).toISOString()
-        : null;
+      const timestamp =
+        parseTrackTimestamp(point.time_utc)?.toISOString() ?? null;
       const lat = point.latitude;
       const lon = point.longitude;
       const ele = point.altitude ?? point.elevation ?? 0;
@@ -323,10 +377,13 @@ function downloadBlob(blob, fileName) {
   const link = document.createElement("a");
   link.href = url;
   link.download = fileName;
+  link.rel = "noopener";
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
-  URL.revokeObjectURL(url);
+
+  // Safari can miss the download if the object URL is revoked immediately.
+  setTimeout(() => URL.revokeObjectURL(url), 1500);
 }
 
 function downloadTrackAsGpx() {
