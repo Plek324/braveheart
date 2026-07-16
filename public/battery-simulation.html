@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Battery Simulation</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header>
+      <h1>Braveheart</h1>
+      <nav class="top-nav" aria-label="Primary navigation">
+        <a href="/">Ship tracker</a>
+        <a href="/battery-simulation" class="active">Battery simulation</a>
+      </nav>
+    </header>
+
+    <main class="battery-page">
+      <section class="control-panel" aria-label="Simulation controls">
+        <div class="control-group">
+          <label for="latitude-select">Latitude</label>
+          <select id="latitude-select">
+            <option value="-60">-60°</option>
+            <option value="-45">-45°</option>
+            <option value="-30">-30°</option>
+            <option value="-15">-15°</option>
+            <option value="0">0°</option>
+            <option value="15">15°</option>
+            <option value="17.06">17.06° (Antigua and Barbuda)</option>
+            <option value="28.1">28.1° (La Gomera)</option>
+            <option value="30">30°</option>
+            <option value="45">45°</option>
+            <option value="52.37" selected>52.37° (Amsterdam)</option>
+            <option value="60">60°</option>
+          </select>
+        </div>
+
+        <div class="control-group">
+          <label for="simulation-date">Start date</label>
+          <input id="simulation-date" type="date" />
+        </div>
+
+        <div class="control-group">
+          <label>Consumers</label>
+          <div id="consumer-list" class="consumer-list"></div>
+          <div class="helper-text">Each consumer draws 1 A.</div>
+        </div>
+
+        <div class="control-group">
+          <label>Cloud cover for the next 7 days</label>
+          <div id="cloud-slider-list" class="cloud-slider-list"></div>
+        </div>
+
+        <div class="summary-card">
+          <p><strong>Battery capacity:</strong> 210 Ah</p>
+          <p id="summary-load-current"><strong>Load current:</strong> 0 A</p>
+          <p><strong>PV peak charging:</strong> 10 A</p>
+        </div>
+      </section>
+
+      <section class="content-panel" aria-label="Simulation results">
+        <div class="status-row">
+          <div id="status-date" class="pill"></div>
+          <div id="status-latitude" class="pill"></div>
+        </div>
+        <div class="graph-wrapper">
+          <svg
+            id="battery-graph"
+            class="battery-graph"
+            viewBox="0 0 1000 440"
+            role="img"
+            aria-label="Battery capacity chart"
+          ></svg>
+        </div>
+      </section>
+    </main>
+
+    <script src="battery-simulation.js"></script>
+  </body>
+</html>

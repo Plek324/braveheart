@@ -89,6 +89,10 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  if (req.url === "/battery-simulation" || req.url === "/battery-simulation/") {
+    req.url = "/battery-simulation.html";
+  }
+
   // Serve static files
   let filepath = req.url === "/" ? "/index.html" : req.url;
   const publicDir = path.join(__dirname, "public");

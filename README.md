@@ -172,6 +172,16 @@ Edit `secrets.env` to change:
 - `AIS_API_KEY` - Your AISStream API key
 - `MMSI_TO_TRACK` - The 9-digit MMSI of the ship to track
 
+## Battery Simulation
+
+Alongside the tracker, `npm run server` also serves a battery simulation page
+at `/battery-simulation`. It's a standalone, client-side tool for modeling a
+210 Ah house battery charged by a 10 A-peak PV system against configurable
+consumers and per-day cloud cover, plotted over a 7-day hourly forecast.
+
+See [docs/battery-simulation.md](docs/battery-simulation.md) for the model
+details, known simplifications, and how to run its tests.
+
 ## Notes
 
 - The tracker uses a global bounding box to ensure the ship is captured wherever it is
