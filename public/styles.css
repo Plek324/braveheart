@@ -243,14 +243,12 @@ main {
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
 }
 
-.consumer-list,
 .cloud-slider-list {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
 }
 
-.consumer-toggle,
 .cloud-control {
   display: flex;
   align-items: center;
@@ -262,10 +260,80 @@ main {
   flex: 1;
 }
 
+.consumers-section {
+  margin-top: 1rem;
+}
+
+.consumers-section h2 {
+  font-size: 1.1rem;
+  margin: 0 0 0.25rem;
+}
+
+.table-wrapper {
+  overflow-x: auto;
+  margin-top: 0.5rem;
+}
+
+.consumer-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+  min-width: 560px;
+}
+
+.consumer-table th,
+.consumer-table td {
+  padding: 0.4rem 0.6rem;
+  border-bottom: 1px solid #eee;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.consumer-table th:first-child,
+.consumer-table td:first-child {
+  text-align: center;
+  width: 2.5rem;
+}
+
+.hour-input {
+  width: 3.5rem;
+}
+
+.duration-cell {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.duration-input {
+  width: 3.5rem;
+}
+
 .helper-text {
   font-size: 0.85rem;
   color: #666;
   margin-top: 0.25rem;
+}
+
+.preset-buttons {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.preset-btn {
+  flex: 1;
+  background-color: #1a5f7a;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 0.5rem 0.75rem;
+  cursor: pointer;
+  font-size: 0.85rem;
+}
+
+.preset-btn:hover {
+  background-color: #144d63;
 }
 
 .summary-card {
@@ -301,7 +369,7 @@ main {
 
 .battery-graph {
   width: 100%;
-  min-width: 760px;
+  min-width: 820px;
   height: auto;
 }
 

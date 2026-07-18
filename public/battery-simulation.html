@@ -38,17 +38,20 @@
         <div class="control-group">
           <label for="simulation-date">Start date</label>
           <input id="simulation-date" type="date" />
-        </div>
-
-        <div class="control-group">
-          <label>Consumers</label>
-          <div id="consumer-list" class="consumer-list"></div>
-          <div class="helper-text">Each consumer draws 1 A.</div>
+          <div class="preset-buttons">
+            <button type="button" id="preset-start" class="preset-btn">To the start</button>
+            <button type="button" id="preset-halfway" class="preset-btn">Half way</button>
+          </div>
         </div>
 
         <div class="control-group">
           <label>Cloud cover for the next 7 days</label>
           <div id="cloud-slider-list" class="cloud-slider-list"></div>
+          <div class="preset-buttons">
+            <button type="button" id="preset-sunny" class="preset-btn">Sunny</button>
+            <button type="button" id="preset-cloudy" class="preset-btn">Cloudy</button>
+            <button type="button" id="preset-bad-weather" class="preset-btn">Bad weather</button>
+          </div>
         </div>
 
         <div class="summary-card">
@@ -67,10 +70,33 @@
           <svg
             id="battery-graph"
             class="battery-graph"
-            viewBox="0 0 1000 440"
+            viewBox="0 0 1080 440"
             role="img"
             aria-label="Battery capacity chart"
           ></svg>
+        </div>
+
+        <div class="consumers-section">
+          <h2>Consumers</h2>
+          <div class="helper-text">
+            Toggle a consumer on, and set the hour it switches on and how
+            long it runs for. A schedule that runs past 24:00 wraps to the
+            next day (e.g. start 18, duration 12:00 = on 18:00-06:00).
+          </div>
+          <div class="table-wrapper">
+            <table id="consumer-table" class="consumer-table">
+              <thead>
+                <tr>
+                  <th>On</th>
+                  <th>Consumer</th>
+                  <th>Current (A)</th>
+                  <th>Start hour</th>
+                  <th>Duration (hh:mm)</th>
+                </tr>
+              </thead>
+              <tbody id="consumer-table-body"></tbody>
+            </table>
+          </div>
         </div>
       </section>
     </main>
