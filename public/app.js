@@ -209,6 +209,33 @@ function getLastTrackedPoint(points) {
   return null;
 }
 
+// Format a latitude/longitude pair as degrees, minutes and seconds, e.g. 52°37'52"N 5°53'17"E
+function formatCoordinatesDM(lat, lon) {
+  const formatComponent = (value, positiveLabel, negativeLabel) => {
+    const hemisphere = value >= 0 ? positiveLabel : negativeLabel;
+    const absValue = Math.abs(value);
+    let degrees = Math.floor(absValue);
+    let minutesFloat = (absValue - degrees) * 60;
+    let minutes = Math.floor(minutesFloat);
+    let seconds = Math.round((minutesFloat - minutes) * 60);
+    if (seconds === 60) {
+      seconds = 0;
+      minutes += 1;
+    }
+    if (minutes === 60) {
+      minutes = 0;
+      degrees += 1;
+    }
+    const paddedMinutes = String(minutes).padStart(2, "0");
+    const paddedSeconds = String(seconds).padStart(2, "0");
+    return `${degrees}°${paddedMinutes}'${paddedSeconds}"${hemisphere}`;
+  };
+
+  const latStr = formatComponent(lat, "N", "S");
+  const lonStr = formatComponent(lon, "E", "W");
+  return `${latStr} ${lonStr}`;
+}
+
 function getNearestTrackPoint(latlng, points) {
   if (!latlng || !Array.isArray(points) || points.length === 0) return null;
 
@@ -507,6 +534,7 @@ function handleMapClickForBearing(event) {
     event.latlng.lng,
   );
   const distanceNm = distanceMeters / 1852;
+  const coordsStr = formatCoordinatesDM(event.latlng.lat, event.latlng.lng);
 
   window._clickLineLayer = L.layerGroup().addTo(map);
 
@@ -519,7 +547,7 @@ function handleMapClickForBearing(event) {
   L.marker(toLatLng, {
     icon: L.divIcon({
       className: "bearing-label",
-      html: `<div class="bearing-label-content">${bearing.toFixed(0)}°<br/>${distanceNm.toFixed(2)} nm</div>`,
+      html: `<div class="bearing-label-content">${bearing.toFixed(0)}°<br/>${distanceNm.toFixed(2)} nm<br/>${coordsStr}</div>`,
       iconSize: [0, 0],
       iconAnchor: [-8, 8],
     }),
