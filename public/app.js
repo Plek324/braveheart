@@ -649,7 +649,13 @@ function renderSlipways(slipways, useIcons) {
           weight: 1,
         });
 
-    marker.bindTooltip(p.name || "Slipway").addTo(window._slipwayLayer);
+    marker.bindTooltip(p.name || "Slipway");
+    marker.on("click", (event) => {
+      L.DomEvent.stopPropagation(event);
+      const url = `https://www.google.com/maps?q=${p.lat},${p.lon}`;
+      window.open(url, "_blank", "noopener,noreferrer");
+    });
+    marker.addTo(window._slipwayLayer);
   });
 }
 
