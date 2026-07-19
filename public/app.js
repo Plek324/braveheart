@@ -184,6 +184,31 @@ function formatTooltipTime(point) {
   });
 }
 
+// Calculate initial bearing (heading) in degrees from point 1 to point 2
+function calculateBearing(lat1, lon1, lat2, lon2) {
+  const toRad = (deg) => (deg * Math.PI) / 180;
+  const phi1 = toRad(lat1);
+  const phi2 = toRad(lat2);
+  const dLon = toRad(lon2 - lon1);
+
+  const y = Math.sin(dLon) * Math.cos(phi2);
+  const x =
+    Math.cos(phi1) * Math.sin(phi2) -
+    Math.sin(phi1) * Math.cos(phi2) * Math.cos(dLon);
+  const bearing = (Math.atan2(y, x) * 180) / Math.PI;
+
+  return (bearing + 360) % 360;
+}
+
+function getLastTrackedPoint(points) {
+  if (!Array.isArray(points)) return null;
+  for (let i = points.length - 1; i >= 0; i--) {
+    const p = points[i];
+    if (p.latitude != null && p.longitude != null) return p;
+  }
+  return null;
+}
+
 function getNearestTrackPoint(latlng, points) {
   if (!latlng || !Array.isArray(points) || points.length === 0) return null;
 
@@ -457,6 +482,50 @@ async function downloadAllTracksAsZip() {
   }
 }
 
+function handleMapClickForBearing(event) {
+  const lastPoint = getLastTrackedPoint(currentTrackPoints);
+  if (!lastPoint) return;
+
+  const map = window._leafletMap;
+  if (window._clickLineLayer) {
+    map.removeLayer(window._clickLineLayer);
+  }
+
+  const fromLatLng = [lastPoint.latitude, lastPoint.longitude];
+  const toLatLng = [event.latlng.lat, event.latlng.lng];
+
+  const bearing = calculateBearing(
+    lastPoint.latitude,
+    lastPoint.longitude,
+    event.latlng.lat,
+    event.latlng.lng,
+  );
+  const distanceMeters = haversineDistance(
+    lastPoint.latitude,
+    lastPoint.longitude,
+    event.latlng.lat,
+    event.latlng.lng,
+  );
+  const distanceNm = distanceMeters / 1852;
+
+  window._clickLineLayer = L.layerGroup().addTo(map);
+
+  L.polyline([fromLatLng, toLatLng], {
+    color: "#FF8C00",
+    weight: 3,
+    dashArray: "6, 6",
+  }).addTo(window._clickLineLayer);
+
+  L.marker(toLatLng, {
+    icon: L.divIcon({
+      className: "bearing-label",
+      html: `<div class="bearing-label-content">${bearing.toFixed(0)}°<br/>${distanceNm.toFixed(2)} nm</div>`,
+      iconSize: [0, 0],
+      iconAnchor: [-8, 8],
+    }),
+  }).addTo(window._clickLineLayer);
+}
+
 function renderTrackOnMap(points, trackMeta) {
   if (!trackMeta) return;
 
@@ -519,6 +588,7 @@ function renderTrackOnMap(points, trackMeta) {
       maxZoom: 19,
       attribution: "© OpenStreetMap contributors",
     }).addTo(window._leafletMap);
+    window._leafletMap.on("click", handleMapClickForBearing);
   }
   let map = window._leafletMap;
 
@@ -527,6 +597,10 @@ function renderTrackOnMap(points, trackMeta) {
   }
   if (window._pointCircles) {
     map.removeLayer(window._pointCircles);
+  }
+  if (window._clickLineLayer) {
+    map.removeLayer(window._clickLineLayer);
+    window._clickLineLayer = null;
   }
 
   const latlngs = Array.isArray(points)
