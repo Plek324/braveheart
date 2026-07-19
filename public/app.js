@@ -272,6 +272,9 @@ const trackInfo = document.getElementById("track-info");
 const refreshIndicator = document.getElementById("refresh-indicator");
 const downloadGpxBtn = document.getElementById("download-gpx");
 const downloadAllTracksBtn = document.getElementById("download-all-tracks");
+const aerialToggle = document.getElementById("aerial-toggle");
+
+let aerialPhotosEnabled = false;
 
 let nextRefreshAt = null;
 let lastRefreshAt = null;
@@ -554,6 +557,48 @@ function handleMapClickForBearing(event) {
   }).addTo(window._clickLineLayer);
 }
 
+const AERIAL_MAX_SPAN_DEGREES = 0.05;
+
+function getOrCreateAerialLayer() {
+  if (!window._aerialLayer) {
+    window._aerialLayer = L.tileLayer(
+      "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+      {
+        maxZoom: 19,
+        attribution:
+          "Tiles © Esri — Source: Esri, Maxar, Earthstar Geographics, and the GIS User Community",
+      },
+    );
+  }
+  return window._aerialLayer;
+}
+
+function updateBaseLayer() {
+  const map = window._leafletMap;
+  if (!map || !window._osmLayer) return;
+
+  const bounds = map.getBounds();
+  const latSpan = bounds.getNorth() - bounds.getSouth();
+  const lonSpan = bounds.getEast() - bounds.getWest();
+  const maxSpan = Math.max(latSpan, lonSpan);
+
+  const useAerial = aerialPhotosEnabled && maxSpan <= AERIAL_MAX_SPAN_DEGREES;
+  const aerialLayer = getOrCreateAerialLayer();
+
+  if (useAerial) {
+    if (map.hasLayer(window._osmLayer)) map.removeLayer(window._osmLayer);
+    if (!map.hasLayer(aerialLayer)) aerialLayer.addTo(map);
+  } else {
+    if (map.hasLayer(aerialLayer)) map.removeLayer(aerialLayer);
+    if (!map.hasLayer(window._osmLayer)) window._osmLayer.addTo(map);
+  }
+}
+
+aerialToggle.addEventListener("change", (e) => {
+  aerialPhotosEnabled = e.target.checked;
+  updateBaseLayer();
+});
+
 const SLIPWAY_MAX_SPAN_DEGREES = 2;
 const SLIPWAY_ICON_MAX_SPAN_DEGREES = 0.5;
 let slipwayUpdateTimer = null;
@@ -697,12 +742,16 @@ function renderTrackOnMap(points, trackMeta) {
   updateRefreshIndicator();
   if (!window._leafletMap) {
     window._leafletMap = L.map("map");
-    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      maxZoom: 19,
-      attribution: "© OpenStreetMap contributors",
-    }).addTo(window._leafletMap);
+    window._osmLayer = L.tileLayer(
+      "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+      {
+        maxZoom: 19,
+        attribution: "© OpenStreetMap contributors",
+      },
+    ).addTo(window._leafletMap);
     window._leafletMap.on("click", handleMapClickForBearing);
     window._leafletMap.on("moveend", scheduleSlipwayUpdate);
+    window._leafletMap.on("moveend", updateBaseLayer);
   }
   let map = window._leafletMap;
 
