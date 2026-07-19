@@ -4,6 +4,7 @@ const path = require("path");
 
 const PORT = process.env.PORT || 3000;
 const DATA_DIR = path.join(__dirname, "data");
+const POI_DIR = path.join(__dirname, "poi");
 
 const MIME_TYPES = {
   ".html": "text/html",
@@ -37,6 +38,25 @@ function getAvailableTracks() {
 function getUniqueMmsis(tracks) {
   const mmsis = new Set(tracks.map((t) => t.mmsi));
   return Array.from(mmsis).sort();
+}
+
+let slipwaysCache = null;
+function getSlipways() {
+  if (slipwaysCache) return slipwaysCache;
+
+  const filepath = path.join(POI_DIR, "slipways_osm.json");
+  const raw = JSON.parse(fs.readFileSync(filepath, "utf8"));
+
+  slipwaysCache = (raw.elements || [])
+    .map((el) => {
+      const lat = el.lat ?? el.center?.lat;
+      const lon = el.lon ?? el.center?.lon;
+      if (lat == null || lon == null) return null;
+      return { id: el.id, lat, lon, name: el.tags?.name || null };
+    })
+    .filter(Boolean);
+
+  return slipwaysCache;
 }
 
 const server = http.createServer((req, res) => {
@@ -84,6 +104,50 @@ const server = http.createServer((req, res) => {
       res.end(JSON.stringify({ error: "Track not found" }));
       console.log(
         `${req.method} ${req.url} 404 ${req.socket.remoteAddress} ${req.headers["user-agent"] || ""}`,
+      );
+    }
+    return;
+  }
+
+  // API: Get slipways within a bounding box
+  if (req.url.startsWith("/api/slipways")) {
+    const parsedUrl = new URL(req.url, `http://${req.headers.host}`);
+    const minLat = parseFloat(parsedUrl.searchParams.get("minLat"));
+    const maxLat = parseFloat(parsedUrl.searchParams.get("maxLat"));
+    const minLon = parseFloat(parsedUrl.searchParams.get("minLon"));
+    const maxLon = parseFloat(parsedUrl.searchParams.get("maxLon"));
+
+    if (
+      ![minLat, maxLat, minLon, maxLon].every((n) => Number.isFinite(n)) ||
+      minLat > maxLat ||
+      minLon > maxLon
+    ) {
+      res.writeHead(400, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "Invalid bounding box" }));
+      console.log(
+        `${req.method} ${req.url} 400 ${req.socket.remoteAddress} ${req.headers["user-agent"] || ""}`,
+      );
+      return;
+    }
+
+    try {
+      const slipways = getSlipways().filter(
+        (p) =>
+          p.lat >= minLat &&
+          p.lat <= maxLat &&
+          p.lon >= minLon &&
+          p.lon <= maxLon,
+      );
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify(slipways));
+      console.log(
+        `${req.method} ${req.url} 200 ${req.socket.remoteAddress} ${req.headers["user-agent"] || ""}`,
+      );
+    } catch (err) {
+      res.writeHead(500, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "Failed to load slipways" }));
+      console.log(
+        `${req.method} ${req.url} 500 ${req.socket.remoteAddress} ${req.headers["user-agent"] || ""}`,
       );
     }
     return;

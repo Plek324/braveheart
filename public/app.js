@@ -554,6 +554,91 @@ function handleMapClickForBearing(event) {
   }).addTo(window._clickLineLayer);
 }
 
+const SLIPWAY_MAX_SPAN_DEGREES = 2;
+const SLIPWAY_ICON_MAX_SPAN_DEGREES = 0.5;
+let slipwayUpdateTimer = null;
+
+const BOAT_RAMP_ICON_HTML = `
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="26" height="26">
+    <polygon points="4,22 26,6 26,12 10,24" fill="#1B4F72" stroke="#0B2942" stroke-width="1"/>
+    <path d="M2 24 Q8 20 14 24 L12 27 Q7 29 4 27 Z" fill="#D35400" stroke="#7B341E" stroke-width="1"/>
+    <path d="M0 27 q4 -3 8 0 t8 0 t8 0 t8 0" stroke="#2E86C1" stroke-width="2" fill="none" stroke-linecap="round"/>
+  </svg>
+`;
+
+const boatRampIcon = L.divIcon({
+  className: "boat-ramp-icon",
+  html: BOAT_RAMP_ICON_HTML,
+  iconSize: [26, 26],
+  iconAnchor: [13, 13],
+});
+
+function scheduleSlipwayUpdate() {
+  clearTimeout(slipwayUpdateTimer);
+  slipwayUpdateTimer = setTimeout(updateSlipwaysVisibility, 300);
+}
+
+function clearSlipwayLayer() {
+  const map = window._leafletMap;
+  if (map && window._slipwayLayer) {
+    map.removeLayer(window._slipwayLayer);
+  }
+  window._slipwayLayer = null;
+}
+
+function renderSlipways(slipways, useIcons) {
+  const map = window._leafletMap;
+  if (!map) return;
+
+  clearSlipwayLayer();
+
+  window._slipwayLayer = L.layerGroup().addTo(map);
+  slipways.forEach((p) => {
+    const marker = useIcons
+      ? L.marker([p.lat, p.lon], { icon: boatRampIcon })
+      : L.circleMarker([p.lat, p.lon], {
+          radius: 5,
+          color: "#1E8449",
+          fillColor: "#58D68D",
+          fillOpacity: 0.9,
+          weight: 1,
+        });
+
+    marker.bindTooltip(p.name || "Slipway").addTo(window._slipwayLayer);
+  });
+}
+
+async function updateSlipwaysVisibility() {
+  const map = window._leafletMap;
+  if (!map) return;
+
+  const bounds = map.getBounds();
+  const latSpan = bounds.getNorth() - bounds.getSouth();
+  const lonSpan = bounds.getEast() - bounds.getWest();
+  const maxSpan = Math.max(latSpan, lonSpan);
+
+  if (maxSpan > SLIPWAY_MAX_SPAN_DEGREES) {
+    clearSlipwayLayer();
+    return;
+  }
+
+  const params = new URLSearchParams({
+    minLat: bounds.getSouth(),
+    maxLat: bounds.getNorth(),
+    minLon: bounds.getWest(),
+    maxLon: bounds.getEast(),
+  });
+
+  try {
+    const resp = await fetch(`/api/slipways?${params}`);
+    if (!resp.ok) throw new Error("Failed to load slipways");
+    const slipways = await resp.json();
+    renderSlipways(slipways, maxSpan <= SLIPWAY_ICON_MAX_SPAN_DEGREES);
+  } catch (err) {
+    console.error("Error loading slipways:", err);
+  }
+}
+
 function renderTrackOnMap(points, trackMeta) {
   if (!trackMeta) return;
 
@@ -617,6 +702,7 @@ function renderTrackOnMap(points, trackMeta) {
       attribution: "© OpenStreetMap contributors",
     }).addTo(window._leafletMap);
     window._leafletMap.on("click", handleMapClickForBearing);
+    window._leafletMap.on("moveend", scheduleSlipwayUpdate);
   }
   let map = window._leafletMap;
 
