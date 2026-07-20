@@ -1,0 +1,106 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 620" width="200" height="620">
+  <defs>
+    <linearGradient id="hullShade" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#cfc6ab"/>
+      <stop offset="12%" stop-color="#efe9d6"/>
+      <stop offset="50%" stop-color="#f7f3e6"/>
+      <stop offset="88%" stop-color="#efe9d6"/>
+      <stop offset="100%" stop-color="#cfc6ab"/>
+    </linearGradient>
+    <linearGradient id="cabinShade" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#173c4d"/>
+      <stop offset="50%" stop-color="#2c6079"/>
+      <stop offset="100%" stop-color="#173c4d"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Hull outline: stern (transom) at top, bow point at bottom -->
+  <path
+    d="M 100 606
+       C 118 566 132 512 138 468
+       C 148 408 158 346 160 286
+       C 162 224 158 152 150 102
+       C 145 72 143 42 138 24
+       L 62 24
+       C 57 42 55 72 50 102
+       C 42 152 38 224 40 286
+       C 42 346 52 408 62 468
+       C 68 512 82 566 100 606
+       Z"
+    fill="url(#hullShade)"
+    stroke="#1a3c53"
+    stroke-width="3"
+  />
+
+  <!-- Bow fitting -->
+  <circle cx="100" cy="600" r="4" fill="#1a3c53" />
+
+  <!-- Stern transom + rudder -->
+  <path d="M 62 24 L 138 24 L 132 6 L 68 6 Z" fill="#1a3c53" />
+  <rect x="92" y="0" width="16" height="10" rx="2" fill="#3a3a3a" />
+
+  <!-- Aft cabin (stern) -->
+  <path
+    d="M 56 26 C 52 44 49 72 46 100 L 154 100 C 151 72 148 44 144 26 Z"
+    fill="url(#cabinShade)"
+    stroke="#0f2733"
+    stroke-width="2"
+  />
+  <circle cx="100" cy="58" r="15" fill="#0f2733" stroke="#3ba7c9" stroke-width="2" />
+  <circle cx="100" cy="58" r="9" fill="#1b4a5e" />
+  <g stroke="#0f2733" stroke-width="1.5" opacity="0.6">
+    <line x1="60" y1="82" x2="140" y2="82" />
+    <line x1="58" y1="90" x2="142" y2="90" />
+  </g>
+  <line x1="46" y1="100" x2="154" y2="100" stroke="#1a3c53" stroke-width="2" />
+
+  <!-- Fore cabin (bow) -->
+  <path
+    d="M 62 466 C 66 500 78 540 100 578 C 122 540 134 500 138 466 Z"
+    fill="url(#cabinShade)"
+    stroke="#0f2733"
+    stroke-width="2"
+  />
+  <circle cx="100" cy="510" r="13" fill="#0f2733" stroke="#3ba7c9" stroke-width="2" />
+  <circle cx="100" cy="510" r="8" fill="#1b4a5e" />
+  <line x1="62" y1="466" x2="138" y2="466" stroke="#1a3c53" stroke-width="2" />
+
+  <!-- Open cockpit deck -->
+  <path
+    d="M 46 100 C 42 152 38 224 40 286 C 42 346 52 408 62 466 L 138 466
+       C 148 408 158 346 160 286 C 162 224 158 152 154 100 Z"
+    fill="#d3dadd"
+    fill-opacity="0.55"
+  />
+
+  <!-- Sliding seat rail (centerline) -->
+  <line x1="94" y1="108" x2="94" y2="458" stroke="#9aa7ab" stroke-width="2" stroke-dasharray="2 5" />
+  <line x1="106" y1="108" x2="106" y2="458" stroke="#9aa7ab" stroke-width="2" stroke-dasharray="2 5" />
+
+  <!-- Rowing position template, reused at three y-offsets via <use> -->
+  <g id="rowing-station">
+    <!-- outriggers -->
+    <line x1="8" y1="0" x2="46" y2="0" stroke="#3a3a3a" stroke-width="4" stroke-linecap="round" />
+    <line x1="154" y1="0" x2="192" y2="0" stroke="#3a3a3a" stroke-width="4" stroke-linecap="round" />
+    <circle cx="12" cy="0" r="5" fill="#3a3a3a" />
+    <circle cx="188" cy="0" r="5" fill="#3a3a3a" />
+    <!-- oars resting across -->
+    <g stroke="#8a5a34" stroke-width="4" stroke-linecap="round">
+      <line x1="12" y1="0" x2="70" y2="-34" />
+      <line x1="188" y1="0" x2="130" y2="-34" />
+    </g>
+    <ellipse cx="66" cy="-40" rx="12" ry="5" fill="#f2ede0" stroke="#8a5a34" stroke-width="1.5" transform="rotate(-25 66 -40)" />
+    <ellipse cx="134" cy="-40" rx="12" ry="5" fill="#f2ede0" stroke="#8a5a34" stroke-width="1.5" transform="rotate(25 134 -40)" />
+    <!-- foot stretcher (toward bow) -->
+    <line x1="70" y1="26" x2="130" y2="26" stroke="#5a4632" stroke-width="4" stroke-linecap="round" />
+    <!-- sliding seat -->
+    <rect x="83" y="-11" width="34" height="22" rx="5" fill="#8a5a34" stroke="#5a4632" stroke-width="1.5" />
+  </g>
+
+  <use href="#rowing-station" x="0" y="190" />
+  <use href="#rowing-station" x="0" y="285" />
+  <use href="#rowing-station" x="0" y="380" />
+
+  <!-- Centerline seam -->
+  <line x1="100" y1="24" x2="100" y2="606" stroke="#1a3c53" stroke-width="1" opacity="0.25" />
+</svg>

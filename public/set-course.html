@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Set Course</title>
+    <link rel="icon" href="favicon.ico" type="image/x-icon" />
+    <link rel="stylesheet" href="styles.css" />
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+      crossorigin=""
+    />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap"
+    />
+    <link rel="stylesheet" href="set-course.css" />
+  </head>
+  <body class="course-body">
+    <header>
+      <h1>Braveheart</h1>
+      <nav class="top-nav" aria-label="Primary navigation">
+        <a href="/">Ship tracker</a>
+        <a href="/battery-simulation">Battery simulation</a>
+        <a href="/set-course" class="active">Set course</a>
+      </nav>
+    </header>
+
+    <main class="cockpit">
+      <!-- Top left: compass -->
+      <section class="panel compass-panel" aria-label="Compass">
+        <div class="panel-label">Compass</div>
+        <div class="compass" id="compass">
+          <div class="compass-window" id="compass-window">
+            <div class="compass-tape" id="compass-tape"></div>
+          </div>
+          <div class="compass-lubber-line"></div>
+        </div>
+      </section>
+
+      <!-- Top middle: instruments -->
+      <section class="panel instruments-panel" aria-label="Onboard instruments">
+        <div class="gnx-cluster">
+          <div class="gnx-display wind-display">
+            <div class="gnx-header">WIND</div>
+            <div class="wind-dial">
+              <svg viewBox="0 0 160 160" width="100%" height="100%">
+                <circle cx="80" cy="80" r="76" class="wind-dial-face" />
+                <g id="wind-ticks"></g>
+                <text x="80" y="22" class="wind-cardinal">0</text>
+                <text x="140" y="84" class="wind-cardinal">90</text>
+                <text x="80" y="146" class="wind-cardinal">180</text>
+                <text x="20" y="84" class="wind-cardinal">270</text>
+                <!-- Own boat, bow fixed up: wind is shown relative to this -->
+                <path
+                  d="M 80 46
+                     C 86 58 89 70 89 82
+                     L 89 102
+                     C 89 109 85 113 80 116
+                     C 75 113 71 109 71 102
+                     L 71 82
+                     C 71 70 74 58 80 46
+                     Z"
+                  class="wind-boat-outline"
+                />
+                <polygon
+                  id="wind-needle"
+                  points="80,20 75,86 80,96 85,86"
+                  class="wind-needle"
+                />
+                <circle cx="80" cy="80" r="6" class="wind-hub" />
+              </svg>
+            </div>
+            <div class="gnx-subrow">
+              <span class="gnx-sub-label">AWS</span>
+              <span class="gnx-sub-value" id="wind-speed">--</span>
+              <span class="gnx-sub-unit">kts</span>
+            </div>
+          </div>
+
+          <div class="gnx-display nav-display">
+            <div class="gnx-header">NAVIGATION</div>
+            <div class="gnx-grid">
+              <div class="gnx-cell">
+                <div class="gnx-cell-label">STW</div>
+                <div class="gnx-cell-value" id="stw-value">--</div>
+                <div class="gnx-cell-unit">kts</div>
+              </div>
+              <div class="gnx-cell">
+                <div class="gnx-cell-label">SOG</div>
+                <div class="gnx-cell-value" id="sog-value">--</div>
+                <div class="gnx-cell-unit">kts</div>
+              </div>
+              <div class="gnx-cell">
+                <div class="gnx-cell-label">COG</div>
+                <div class="gnx-cell-value" id="cog-value">--</div>
+                <div class="gnx-cell-unit">&deg;T</div>
+              </div>
+              <div class="gnx-cell">
+                <div class="gnx-cell-label">TIME (UTC)</div>
+                <div class="gnx-cell-value gnx-time" id="time-value">--:--:--</div>
+                <div class="gnx-cell-unit">&nbsp;</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Top right: autopilot -->
+      <section class="panel autopilot-panel" aria-label="Autopilot">
+        <div class="panel-label">Autopilot</div>
+        <div class="autopilot">
+          <div class="autopilot-readout">
+            <div class="autopilot-label">HDG</div>
+            <div class="autopilot-digits" id="autopilot-hdg">237</div>
+          </div>
+          <div class="autopilot-readout autopilot-readout-set">
+            <div class="autopilot-label">SET</div>
+            <div class="autopilot-digits autopilot-digits-set" id="autopilot-set">
+              240
+            </div>
+          </div>
+          <div class="autopilot-buttons">
+            <button type="button" class="ap-btn" data-delta="-5">-5</button>
+            <button type="button" class="ap-btn" data-delta="-1">-1</button>
+            <button type="button" class="ap-btn" data-delta="1">+1</button>
+            <button type="button" class="ap-btn" data-delta="5">+5</button>
+          </div>
+          <div class="autopilot-status" id="autopilot-status">AUTO &middot; ENGAGED</div>
+        </div>
+      </section>
+
+      <!-- Center: rowing boat -->
+      <div class="boat-stage" aria-label="Boat view">
+        <img
+          src="rowboat.svg"
+          alt="Ocean rowing boat, bow toward the bottom of the screen, stern at the top, three rowing positions"
+          class="boat-image"
+        />
+      </div>
+
+      <!-- Bottom left: track map -->
+      <section class="panel map-panel" aria-label="Track sailed so far">
+        <div class="panel-label">Track sailed so far</div>
+        <div id="course-map"></div>
+      </section>
+
+      <!-- Bottom right: weather router -->
+      <section class="panel router-panel" aria-label="Weather router messages">
+        <div class="panel-label">
+          Weather router
+          <span class="router-next" id="router-next"></span>
+        </div>
+        <div class="router-message">
+          <div class="router-message-header">
+            <span id="router-timestamp">--</span>
+            <span class="router-badge" id="router-badge">COURSE UPDATE</span>
+          </div>
+          <pre class="router-message-body" id="router-body">Standing by...</pre>
+        </div>
+      </section>
+
+      <!-- Hidden simulation values, for debugging/future use -->
+      <button
+        type="button"
+        id="reveal-btn"
+        class="reveal-btn"
+        aria-label="Reveal hidden simulation values"
+        title="Reveal hidden values"
+      >
+        &#9881;
+      </button>
+      <div class="reveal-panel" id="reveal-panel" aria-live="polite">
+        <div class="reveal-panel-header">
+          Hidden values
+          <span class="reveal-panel-sub">auto-hides in 15s</span>
+        </div>
+        <dl class="reveal-list">
+          <dt>Compass error</dt>
+          <dd id="reveal-compass-error">--</dd>
+          <dt>Autopilot error</dt>
+          <dd id="reveal-autopilot-error">--</dd>
+          <dt>Real wind</dt>
+          <dd id="reveal-true-wind">--</dd>
+          <dt>Ocean current</dt>
+          <dd id="reveal-current">--</dd>
+        </dl>
+      </div>
+    </main>
+
+    <script
+      src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+      crossorigin=""
+    ></script>
+    <script src="set-course.js"></script>
+  </body>
+</html>

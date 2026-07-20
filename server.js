@@ -13,6 +13,7 @@ const MIME_TYPES = {
   ".json": "application/json",
   ".png": "image/png",
   ".jpg": "image/jpeg",
+  ".svg": "image/svg+xml",
 };
 
 function isValidTrackFilename(name) {
@@ -155,6 +156,10 @@ const server = http.createServer((req, res) => {
 
   if (req.url === "/battery-simulation" || req.url === "/battery-simulation/") {
     req.url = "/battery-simulation.html";
+  }
+
+  if (req.url === "/set-course" || req.url === "/set-course/") {
+    req.url = "/set-course.html";
   }
 
   // Serve static files
