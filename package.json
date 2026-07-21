@@ -1,6 +1,6 @@
 {
   "name": "ship-tracker",
-  "version": "0.1.9",
+  "version": "0.2.0",
   "description": "Track ships by MMSI using AISStream websocket",
   "main": "tracker.js",
   "scripts": {
