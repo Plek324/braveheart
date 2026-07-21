@@ -154,16 +154,16 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  if (req.url === "/battery-simulation" || req.url === "/battery-simulation/") {
-    req.url = "/battery-simulation.html";
-  }
+  let pathname = new URL(req.url, `http://${req.headers.host}`).pathname;
 
-  if (req.url === "/set-course" || req.url === "/set-course/") {
-    req.url = "/set-course.html";
+  if (pathname === "/battery-simulation" || pathname === "/battery-simulation/") {
+    pathname = "/battery-simulation.html";
+  } else if (pathname === "/set-course" || pathname === "/set-course/") {
+    pathname = "/set-course.html";
   }
 
   // Serve static files
-  let filepath = req.url === "/" ? "/index.html" : req.url;
+  let filepath = pathname === "/" ? "/index.html" : pathname;
   const publicDir = path.join(__dirname, "public");
   const requested = path.join(publicDir, filepath);
   const resolved = path.resolve(requested);

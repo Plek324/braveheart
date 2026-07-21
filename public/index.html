@@ -12,6 +12,22 @@
       crossorigin=""
     />
     <link rel="stylesheet" href="leaflet-map.css" />
+    <style>
+      .top-nav {
+        display: none;
+      }
+      html.advanced-mode .top-nav {
+        display: flex;
+      }
+    </style>
+    <script>
+      var advancedParam = new URLSearchParams(window.location.search).get(
+        "advanced",
+      );
+      if (advancedParam !== null && advancedParam !== "false") {
+        document.documentElement.classList.add("advanced-mode");
+      }
+    </script>
   </head>
   <body>
     <header>
