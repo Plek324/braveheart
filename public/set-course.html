@@ -98,8 +98,13 @@
                 <div class="gnx-cell-unit">&deg;T</div>
               </div>
               <div class="gnx-cell">
-                <div class="gnx-cell-label">TIME (UTC)</div>
-                <div class="gnx-cell-value gnx-time" id="time-value">--:--:--</div>
+                <div class="gnx-cell-label">DAY</div>
+                <div class="gnx-cell-value" id="day-value">1</div>
+                <div class="gnx-cell-unit">&nbsp;</div>
+              </div>
+              <div class="gnx-cell gnx-cell-wide">
+                <div class="gnx-cell-label">ELAPSED</div>
+                <div class="gnx-cell-value gnx-time" id="time-value">0:00:00</div>
                 <div class="gnx-cell-unit">&nbsp;</div>
               </div>
             </div>
@@ -122,10 +127,10 @@
             </div>
           </div>
           <div class="autopilot-buttons">
-            <button type="button" class="ap-btn" data-delta="-5">-5</button>
-            <button type="button" class="ap-btn" data-delta="-1">-1</button>
-            <button type="button" class="ap-btn" data-delta="1">+1</button>
-            <button type="button" class="ap-btn" data-delta="5">+5</button>
+            <button type="button" class="ap-btn" data-delta="-10" aria-label="Decrease heading by 10 degrees"><span class="ap-arrow ap-arrow-left"></span><span class="ap-arrow ap-arrow-left"></span></button>
+            <button type="button" class="ap-btn" data-delta="-1" aria-label="Decrease heading by 1 degree"><span class="ap-arrow ap-arrow-left"></span></button>
+            <button type="button" class="ap-btn" data-delta="1" aria-label="Increase heading by 1 degree"><span class="ap-arrow ap-arrow-right"></span></button>
+            <button type="button" class="ap-btn" data-delta="10" aria-label="Increase heading by 10 degrees"><span class="ap-arrow ap-arrow-right"></span><span class="ap-arrow ap-arrow-right"></span></button>
           </div>
           <div class="autopilot-status" id="autopilot-status">AUTO &middot; ENGAGED</div>
         </div>

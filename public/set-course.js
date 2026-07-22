@@ -417,20 +417,34 @@ function tickSimulation() {
   updateTrackMap();
 }
 
-function tickClock() {
-  const now = new Date();
-  const hh = now.getUTCHours().toString().padStart(2, "0");
-  const mm = now.getUTCMinutes().toString().padStart(2, "0");
-  const ss = now.getUTCSeconds().toString().padStart(2, "0");
+// The simulated clock runs faster than real time by the same factor the
+// boat moves faster than it should: one tick advances the boat by
+// TICK_SIM_MINUTES of sim time every TICK_INTERVAL_MS of real time.
+const TICK_INTERVAL_MS = 1200;
+const SIM_MS_PER_REAL_MS = (TICK_SIM_MINUTES * 60 * 1000) / TICK_INTERVAL_MS;
+const simClockStart = Date.now();
+
+function tickSimClock() {
+  const simElapsedSeconds = Math.floor(
+    ((Date.now() - simClockStart) * SIM_MS_PER_REAL_MS) / 1000,
+  );
+  const day = Math.floor(simElapsedSeconds / 86400) + 1;
+  const secondsInDay = simElapsedSeconds % 86400;
+  const hh = Math.floor(secondsInDay / 3600);
+  const mm = Math.floor((secondsInDay % 3600) / 60)
+    .toString()
+    .padStart(2, "0");
+  const ss = (secondsInDay % 60).toString().padStart(2, "0");
   document.getElementById("time-value").textContent = `${hh}:${mm}:${ss}`;
+  document.getElementById("day-value").textContent = day;
 }
 
 moveCompassTape(normalizeDeg(state.heading + COMPASS_ERROR));
 renderAutopilot();
 windSpeedEl.textContent = state.aws.toFixed(1);
-tickClock();
-setInterval(tickSimulation, 1200);
-setInterval(tickClock, 1000);
+tickSimClock();
+setInterval(tickSimulation, TICK_INTERVAL_MS);
+setInterval(tickSimClock, 1000);
 
 // ---------- Weather router ----------
 

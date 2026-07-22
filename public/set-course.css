@@ -337,6 +337,10 @@ html:has(.course-body) {
   text-align: center;
 }
 
+.gnx-cell-wide {
+  grid-column: 1 / -1;
+}
+
 .gnx-cell-label {
   font-size: 0.68rem;
   letter-spacing: 0.1em;
@@ -422,9 +426,12 @@ html:has(.course-body) {
 }
 
 .ap-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
   font-family: inherit;
-  font-size: 0.95rem;
-  padding: 0.45rem 0;
+  padding: 0.55rem 0;
   border-radius: 6px;
   border: 1px solid #2b5567;
   background: linear-gradient(180deg, #123241 0%, #0a1f29 100%);
@@ -433,6 +440,21 @@ html:has(.course-body) {
   transition:
     transform 0.05s ease,
     background 0.15s ease;
+}
+
+.ap-arrow {
+  width: 0;
+  height: 0;
+  border-top: 8px solid transparent;
+  border-bottom: 8px solid transparent;
+}
+
+.ap-arrow-left {
+  border-right: 12px solid var(--accent);
+}
+
+.ap-arrow-right {
+  border-left: 12px solid var(--accent);
 }
 
 .ap-btn:hover {
