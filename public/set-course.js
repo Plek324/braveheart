@@ -265,10 +265,25 @@ function computeGroundTrack(
   return { sog, cog };
 }
 
-// Each simulation tick represents this many minutes of boat time — purely
-// a game-pacing choice so drift becomes visible on the map within a
-// reasonable play session instead of requiring real hours to accumulate.
-const TICK_SIM_MINUTES = 1;
+// Sim speed: how many sim-seconds elapse per real second. Runs at 1:1
+// ("real time") right after the boat departs, after the autopilot's set
+// heading is changed, and after a weather router message comes in — then,
+// once the (miscalibrated) autopilot's own heading reading settles within
+// 2deg of SET and stays there for 15 real seconds, ramps up to 1 sim-minute
+// per real second so drift becomes visible without requiring real hours to
+// accumulate.
+const SIM_SPEED_SLOW = 1; // 1 sim-second / real-second, i.e. 1:1
+const SIM_SPEED_FAST = 60; // 1 sim-minute / real-second
+let simSpeedMultiplier = SIM_SPEED_SLOW;
+let headingSettleTimer = null;
+
+function resetSimSpeed() {
+  simSpeedMultiplier = SIM_SPEED_SLOW;
+  if (headingSettleTimer) {
+    clearTimeout(headingSettleTimer);
+    headingSettleTimer = null;
+  }
+}
 
 // Flat-earth dead-reckoning step: move `distanceNm` along `courseDeg` from
 // (lat, lon). Fine at this scale/duration; not meant for real navigation.
@@ -314,6 +329,7 @@ document.querySelectorAll(".ap-btn").forEach((btn) => {
   btn.addEventListener("click", () => {
     const delta = parseInt(btn.dataset.delta, 10);
     state.setHeading = normalizeDeg(state.setHeading + delta);
+    resetSimSpeed();
     renderAutopilot();
   });
 });
@@ -331,7 +347,7 @@ function jitter(value, amount, min, max) {
   return Math.min(max, Math.max(min, next));
 }
 
-function tickSimulation() {
+function tickSimulation(minutesOverride) {
   // The autopilot only knows its own (miscalibrated) compass reading, not
   // the boat's true heading — it steers to make THAT reading match SET.
   // So if its compass is off by, say, +49deg, the boat actually settles on
@@ -367,9 +383,16 @@ function tickSimulation() {
 
   // Advance both positions: the actual track (COG/SOG, current included)
   // and the dead-reckoning track (heading/STW only) — the space between
-  // them on the map is the drift.
-  const stepDistanceNm = state.sog * (TICK_SIM_MINUTES / 60);
-  const drStepDistanceNm = state.stw * (TICK_SIM_MINUTES / 60);
+  // them on the map is the drift. How much sim time this tick covers
+  // depends on the current sim speed (see resetSimSpeed / the heading
+  // settle check below).
+  const tickSimMinutes =
+    minutesOverride != null
+      ? minutesOverride
+      : (simSpeedMultiplier * TICK_INTERVAL_MS) / 1000 / 60;
+  simAccumulatedSeconds += tickSimMinutes * 60;
+  const stepDistanceNm = state.sog * (tickSimMinutes / 60);
+  const drStepDistanceNm = state.stw * (tickSimMinutes / 60);
   const actualPos = advancePosition(
     state.lat,
     state.lon,
@@ -403,8 +426,30 @@ function tickSimulation() {
   state.aws = apparent.speed;
   state.awa = normalizeDeg(apparent.fromDeg - state.heading);
 
+  // Speed ramp-up: only arms once the autopilot's own (miscalibrated)
+  // heading reading is within 2deg of SET, and only fires after that's held
+  // for a further 15 real seconds — if it drifts back out of range first,
+  // the timer is cancelled and has to re-arm.
+  const currentMeasuredHeading = normalizeDeg(
+    state.heading + AUTOPILOT_COMPASS_ERROR,
+  );
+  const headingSettled =
+    Math.abs(shortestTurn(currentMeasuredHeading, state.setHeading)) <= 2;
+  if (headingSettled) {
+    if (simSpeedMultiplier === SIM_SPEED_SLOW && !headingSettleTimer) {
+      headingSettleTimer = setTimeout(() => {
+        simSpeedMultiplier = SIM_SPEED_FAST;
+        headingSettleTimer = null;
+      }, 15000);
+    }
+  } else if (headingSettleTimer) {
+    clearTimeout(headingSettleTimer);
+    headingSettleTimer = null;
+  }
+
   compassRotator.setTarget(normalizeDeg(state.heading + COMPASS_ERROR));
   renderAutopilot();
+  renderSimClock();
   windRotator.setTarget(state.awa);
   windSpeedEl.textContent = state.aws.toFixed(1);
   document.getElementById("stw-value").textContent = state.stw.toFixed(1);
@@ -417,17 +462,18 @@ function tickSimulation() {
   updateTrackMap();
 }
 
-// The simulated clock runs faster than real time by the same factor the
-// boat moves faster than it should: one tick advances the boat by
-// TICK_SIM_MINUTES of sim time every TICK_INTERVAL_MS of real time.
 const TICK_INTERVAL_MS = 1200;
-const SIM_MS_PER_REAL_MS = (TICK_SIM_MINUTES * 60 * 1000) / TICK_INTERVAL_MS;
-const simClockStart = Date.now();
 
-function tickSimClock() {
-  const simElapsedSeconds = Math.floor(
-    ((Date.now() - simClockStart) * SIM_MS_PER_REAL_MS) / 1000,
-  );
+// The simulated clock runs faster than real time, by whatever factor each
+// tick's sim-minutes works out to (see tickSimulation) — accumulated tick
+// by tick, driven by the ticks themselves rather than by wall-clock deltas,
+// so it advances correctly both during normal ticking AND when the
+// "advance N hours" controls below fast-forward through many ticks with no
+// real time passing between them.
+let simAccumulatedSeconds = 0;
+
+function renderSimClock() {
+  const simElapsedSeconds = Math.floor(simAccumulatedSeconds);
   const day = Math.floor(simElapsedSeconds / 86400) + 1;
   const secondsInDay = simElapsedSeconds % 86400;
   const hh = Math.floor(secondsInDay / 3600);
@@ -442,9 +488,70 @@ function tickSimClock() {
 moveCompassTape(normalizeDeg(state.heading + COMPASS_ERROR));
 renderAutopilot();
 windSpeedEl.textContent = state.aws.toFixed(1);
-tickSimClock();
-setInterval(tickSimulation, TICK_INTERVAL_MS);
-setInterval(tickSimClock, 1000);
+renderSimClock();
+
+// The regular tick interval steps back while "advance N hours" is driving
+// tickSimulation itself (see below) — otherwise the two would race and
+// double-advance the boat.
+setInterval(() => {
+  if (!advanceActive) tickSimulation();
+}, TICK_INTERVAL_MS);
+
+// ---------- Advance controls (fast-forward N hours) ----------
+//
+// Rather than jumping state straight to N hours later, this steps through
+// the same tickSimulation() the normal clock uses, just back-to-back with
+// no real-time wait between calls — so wind/current drift and autopilot
+// correction still happen incrementally, and a weather router message
+// posted partway through (see postRouterMessage's requestAdvanceStop call)
+// halts the fast-forward right there instead of running past it.
+const ADVANCE_TICK_MS = 50; // real ms between ticks while fast-forwarding
+const ADVANCE_MINUTES_PER_TICK = 2; // sim-minutes each fast-forward tick covers
+let advanceActive = false;
+let advanceStopRequested = false;
+
+function requestAdvanceStop() {
+  if (advanceActive) advanceStopRequested = true;
+}
+
+function setAdvanceButtonsDisabled(disabled) {
+  document
+    .querySelectorAll(".advance-btn")
+    .forEach((btn) => (btn.disabled = disabled));
+}
+
+function advanceSimulation(hours) {
+  if (advanceActive) return;
+  advanceActive = true;
+  advanceStopRequested = false;
+  setAdvanceButtonsDisabled(true);
+
+  const targetSeconds = hours * 3600;
+  let advancedSeconds = 0;
+
+  function step() {
+    if (advanceStopRequested || advancedSeconds >= targetSeconds) {
+      advanceActive = false;
+      setAdvanceButtonsDisabled(false);
+      return;
+    }
+    const remainingSeconds = targetSeconds - advancedSeconds;
+    const tickMinutes = Math.min(
+      ADVANCE_MINUTES_PER_TICK,
+      remainingSeconds / 60,
+    );
+    tickSimulation(tickMinutes);
+    advancedSeconds += tickMinutes * 60;
+    setTimeout(step, ADVANCE_TICK_MS);
+  }
+  step();
+}
+
+document.querySelectorAll(".advance-btn").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    advanceSimulation(parseFloat(btn.dataset.hours));
+  });
+});
 
 // ---------- Weather router ----------
 
@@ -521,6 +628,8 @@ function postRouterMessage(text, badge, nextLabel) {
   document.getElementById("router-body").textContent = text;
   document.getElementById("router-next").textContent = nextLabel;
   playDingDong();
+  resetSimSpeed();
+  requestAdvanceStop();
 }
 
 // Miles of clearance to aim south of the waypoint's exact latitude, so a

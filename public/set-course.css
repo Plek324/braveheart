@@ -661,6 +661,50 @@ html:has(.course-body) {
   text-shadow: 0 0 4px rgba(255, 194, 102, 0.35);
 }
 
+/* ---------- Advance controls (bottom center) ---------- */
+
+.advance-controls {
+  position: fixed;
+  left: 50%;
+  bottom: 16px;
+  transform: translateX(-50%);
+  z-index: 50;
+  display: flex;
+  gap: 0.6rem;
+}
+
+.advance-btn {
+  font-family: inherit;
+  font-size: 0.78rem;
+  letter-spacing: 0.04em;
+  padding: 0.5rem 0.9rem;
+  border-radius: 8px;
+  border: 1px solid #2b5567;
+  background: rgba(8, 30, 46, 0.85);
+  color: var(--accent);
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(6px);
+  transition:
+    transform 0.05s ease,
+    background 0.15s ease,
+    opacity 0.15s ease;
+}
+
+.advance-btn:hover:not(:disabled) {
+  background: linear-gradient(180deg, #17475b 0%, #0d2733 100%);
+}
+
+.advance-btn:active:not(:disabled) {
+  transform: translateY(1px) scale(0.97);
+  background: #1c5468;
+}
+
+.advance-btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
 /* ---------- Responsive ---------- */
 
 @media (max-width: 900px) {
