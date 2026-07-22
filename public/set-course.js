@@ -555,6 +555,15 @@ document.querySelectorAll(".advance-btn").forEach((btn) => {
 
 // ---------- Weather router ----------
 
+// The router's "06:00 UTC" schedule tracks the simulated clock
+// (simAccumulatedSeconds), not the browser's wall clock — otherwise sim
+// speed changes and the "advance N hours" fast-forward wouldn't line up
+// with when the daily message actually arrives.
+const voyageStartUtc = new Date();
+function simNow() {
+  return new Date(voyageStartUtc.getTime() + simAccumulatedSeconds * 1000);
+}
+
 function nextSixAm(from) {
   const next = new Date(
     Date.UTC(
@@ -622,7 +631,7 @@ function playDingDong() {
 
 function postRouterMessage(text, badge, nextLabel) {
   document.getElementById("router-timestamp").textContent = formatUtc(
-    new Date(),
+    simNow(),
   );
   document.getElementById("router-badge").textContent = badge;
   document.getElementById("router-body").textContent = text;
@@ -667,7 +676,7 @@ function updateRouterPhase() {
   if (state.routerPhase === "toWaypoint") {
     if (state.lon > WAYPOINT.lon) return;
     state.routerPhase = "openOcean";
-    state.routerNextDailyAt = nextSixAm(new Date());
+    state.routerNextDailyAt = nextSixAm(simNow());
     postRouterMessage(
       "Waypoint passed well to the south. Ridge building to the NE over " +
         "the next 48h — recommend steering 240T to stay south of the high " +
@@ -679,7 +688,7 @@ function updateRouterPhase() {
   }
 
   // openOcean: resume the normal daily ~06:00 UTC schedule.
-  const now = new Date();
+  const now = simNow();
   if (!state.routerNextDailyAt) state.routerNextDailyAt = nextSixAm(now);
   if (now >= state.routerNextDailyAt) {
     postRouterMessage(
